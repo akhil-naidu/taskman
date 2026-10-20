@@ -1,0 +1,11 @@
+---
+description: Dense dark shadcn workspace for the taskman shell
+globs: "{app,components}/**/*.{tsx,css}"
+alwaysApply: false
+---
+
+# Workspace UI
+
+Follow `.cursor/skills/shadcn-ui/SKILL.md` and `.cursor/skills/tailwind/SKILL.md`.
+
+Dark-first, dense, sidebar, command palette, subtle borders, monochrome surfaces, org color only as a small accent. List and board views show the same tasks.

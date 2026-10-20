@@ -1,0 +1,14 @@
+---
+description: Convex schema, functions, indexes, and HTTP actions
+globs: convex/**/*.ts
+alwaysApply: false
+---
+
+# Convex
+
+Follow `.cursor/skills/convex/SKILL.md`.
+
+- Validators on `args` and `returns` for new functions.
+- Index queries. Pass time into queries. Hash tokens at rest.
+- Ingest that would pass a cap fails. Do not drop rows.
+- No production `npx convex deploy` and no Convex setting changes.

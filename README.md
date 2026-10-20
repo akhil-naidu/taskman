@@ -106,6 +106,14 @@ Adapters live in `convex/model/sync.ts`. Each one is read-only: `pull` only, no 
 - **ClickUp** is implemented. It GETs list or team tasks with the token saved on the workspace, keeps the external id and URL, and upserts on `clickup:<id>`. Put a team id or list ids on that connection. The Board page runs it with **Sync ClickUp**. There is no write-back.
 - **GitHub Issues, Linear, and Jira** are stubs. Their buttons report that the adapter is not implemented and do not call those APIs. Credentials for those providers, and for Dropbox, can still be saved on the workspace.
 
+## OpenSpec
+
+Behavior is specified in `openspec/`. `openspec/project.md` is the product context. `openspec/specs/` is the baseline. New behavior starts as a change under `openspec/changes/` (`proposal.md`, `tasks.md`, and spec deltas) before feature code. `AGENTS.md` is the workflow for later agents.
+
+```bash
+npx @fission-ai/openspec validate --all --strict
+```
+
 ## Railway
 
 The image is built from the `Dockerfile` (`output: "standalone"`). `railway.toml` points Railway at that file and starts `node server.js`. Pass `NEXT_PUBLIC_CONVEX_URL` as a build arg so the browser bundle can reach Convex. Do not bake secrets into the image. This repo's CI does not deploy.
