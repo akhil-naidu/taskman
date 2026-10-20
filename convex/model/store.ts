@@ -20,7 +20,7 @@ function byKey<T extends { key: string }>(rows: T[]): T[] {
 }
 
 export function emptyState(): FleetState {
-  return { bots: [], routines: [], runs: [], tasks: [], sources: [], syncLinks: [], ingestRuns: [] };
+  return { bots: [], routines: [], runs: [], tasks: [], sources: [], syncLinks: [], ingestRuns: [], instructions: [] };
 }
 
 function isProvider(value: string): value is Provider {
@@ -54,6 +54,7 @@ function finish(state: FleetState): FleetState {
     sources: byKey(state.sources),
     syncLinks: byKey(state.syncLinks),
     ingestRuns: byKey(state.ingestRuns),
+    instructions: byKey(state.instructions ?? []),
   };
 }
 
@@ -85,9 +86,9 @@ export function planSnapshot(
   }
   const botByKey = new Map(snapshot.bots.map((bot) => [bot.key, bot]));
 
-  const reportedByKey = new Map(existing.bots.map((bot) => [bot.key, bot.reportedStatus]));
+  const previousByKey = new Map(existing.bots.map((bot) => [bot.key, bot]));
   const bots: BotRow[] = snapshot.bots.map((bot) => {
-    const reportedStatus = reportedByKey.get(bot.key);
+    const previous = previousByKey.get(bot.key);
     return {
       key: bot.key,
       name: bot.name,
@@ -103,12 +104,18 @@ export function planSnapshot(
       openItems: [...bot.open],
       activity: [...bot.activity],
       notes: [...bot.notes],
-      ...(reportedStatus ? { reportedStatus } : {}),
+      ...(previous?.reportedStatus ? { reportedStatus: previous.reportedStatus } : {}),
+      ...(previous?.origin ? { origin: previous.origin } : {}),
+      ...(previous?.heartbeatStatus ? { heartbeatStatus: previous.heartbeatStatus } : {}),
+      ...(previous?.currentTaskKey ? { currentTaskKey: previous.currentTaskKey } : {}),
+      ...(previous?.currentTaskText ? { currentTaskText: previous.currentTaskText } : {}),
+      ...(previous?.lastHeartbeatAt ? { lastHeartbeatAt: previous.lastHeartbeatAt } : {}),
       updatedAt: now,
     };
   });
   const nextBotKeys = new Set(bots.map((bot) => bot.key));
-  const botMap = new Map((replace ? [] : existing.bots).map((bot) => [bot.key, bot]));
+  const preservedMcp = replace ? existing.bots.filter((bot) => bot.origin === "mcp" && !nextBotKeys.has(bot.key)) : existing.bots;
+  const botMap = new Map(preservedMcp.map((bot) => [bot.key, bot]));
   for (const bot of bots) botMap.set(bot.key, bot);
 
   const routines: RoutineRow[] = [];
@@ -117,11 +124,11 @@ export function planSnapshot(
       routines.push({ key: `${bot.key}:${name}`, botKey: bot.key, name, updatedAt: now });
     }
   }
+  const mcpBotKeys = new Set([...previousByKey.values()].filter((bot) => bot.origin === "mcp").map((bot) => bot.key));
   const routineMap = new Map(
-    (replace ? [] : existing.routines.filter((routine) => !nextBotKeys.has(routine.botKey))).map((routine) => [
-      routine.key,
-      routine,
-    ]),
+    (replace ? existing.routines.filter((routine) => mcpBotKeys.has(routine.botKey)) : existing.routines.filter((routine) => !nextBotKeys.has(routine.botKey))).map(
+      (routine) => [routine.key, routine],
+    ),
   );
   for (const routine of routines) routineMap.set(routine.key, routine);
 
@@ -256,6 +263,7 @@ export function planSnapshot(
         message: "",
       },
     ],
+    instructions: existing.instructions,
   });
 }
 

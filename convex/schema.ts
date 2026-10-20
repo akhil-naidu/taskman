@@ -2,7 +2,15 @@ import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
-const taskStatus = v.union(v.literal("waiting"), v.literal("todo"), v.literal("in_progress"), v.literal("done"));
+const taskStatus = v.union(
+  v.literal("waiting"),
+  v.literal("todo"),
+  v.literal("in_progress"),
+  v.literal("done"),
+  v.literal("backlog"),
+  v.literal("approved"),
+  v.literal("waiting_human"),
+);
 const urgency = v.union(v.literal("high"), v.literal("normal"));
 const provider = v.union(
   v.literal("clickup"),
@@ -82,6 +90,11 @@ export default defineSchema({
     activity: v.array(v.string()),
     notes: v.array(v.string()),
     reportedStatus: v.optional(v.union(v.literal("waiting"), v.literal("active"), v.literal("routine"), v.literal("on-demand"))),
+    origin: v.optional(v.union(v.literal("mcp"), v.literal("fleet"))),
+    heartbeatStatus: v.optional(v.string()),
+    currentTaskKey: v.optional(v.string()),
+    currentTaskText: v.optional(v.string()),
+    lastHeartbeatAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
     .index("by_workspace", ["workspaceId"])
@@ -124,6 +137,11 @@ export default defineSchema({
     externalId: v.string(),
     externalUrl: v.string(),
     addedDate: v.string(),
+    needsHuman: v.optional(v.boolean()),
+    question: v.optional(v.string()),
+    options: v.optional(v.array(v.string())),
+    progress: v.optional(v.array(v.string())),
+    decision: v.optional(v.string()),
     updatedAt: v.number(),
   })
     .index("by_workspace", ["workspaceId"])
@@ -161,4 +179,50 @@ export default defineSchema({
   })
     .index("by_workspace", ["workspaceId"])
     .index("by_workspace_key", ["workspaceId", "key"]),
+  instructions: defineTable({
+    workspaceId,
+    key: v.string(),
+    botKey: v.string(),
+    taskKey: v.string(),
+    kind: v.union(v.literal("instruction"), v.literal("decision")),
+    body: v.string(),
+    options: v.array(v.string()),
+    answer: v.string(),
+    status: v.union(v.literal("pending"), v.literal("acked")),
+    createdAt: v.number(),
+    ackedAt: v.number(),
+  })
+    .index("by_workspace", ["workspaceId"])
+    .index("by_workspace_key", ["workspaceId", "key"]),
+  oauthClients: defineTable({
+    clientId: v.string(),
+    clientSecretHash: v.optional(v.string()),
+    clientName: v.string(),
+    redirectUris: v.array(v.string()),
+    tokenEndpointAuthMethod: v.string(),
+    createdAt: v.number(),
+  }).index("by_clientId", ["clientId"]),
+  oauthCodes: defineTable({
+    codeHash: v.string(),
+    clientId: v.string(),
+    userId: v.id("users"),
+    workspaceId,
+    redirectUri: v.string(),
+    codeChallenge: v.string(),
+    scopes: v.array(v.string()),
+    resource: v.string(),
+    expiresAt: v.number(),
+    consumedAt: v.optional(v.number()),
+  }).index("by_codeHash", ["codeHash"]),
+  oauthTokens: defineTable({
+    tokenHash: v.string(),
+    kind: v.union(v.literal("access"), v.literal("refresh")),
+    clientId: v.string(),
+    userId: v.id("users"),
+    workspaceId,
+    scopes: v.array(v.string()),
+    expiresAt: v.number(),
+    revokedAt: v.optional(v.number()),
+    replacedByHash: v.optional(v.string()),
+  }).index("by_tokenHash", ["tokenHash"]),
 });

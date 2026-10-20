@@ -12,7 +12,7 @@ import { Dashboard } from "@/components/dashboard";
 import { Shell } from "@/components/shell";
 import { activeWorkspace, useWorkspaceSelection } from "@/components/workspace-selection";
 
-export function Screen({ page, example }: { page: "fleet" | "board"; example: FleetSnapshot | null }) {
+export function Screen({ page, example }: { page: "fleet" | "board" | "bots"; example: FleetSnapshot | null }) {
   if (example) return <ExampleDashboard page={page} snapshot={example} />;
   if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
     return <p className="p-6 text-sm text-[var(--mu)]">Set NEXT_PUBLIC_CONVEX_URL to load a live fleet.</p>;
@@ -20,7 +20,7 @@ export function Screen({ page, example }: { page: "fleet" | "board"; example: Fl
   return <LiveDashboard page={page} />;
 }
 
-function ExampleDashboard({ page, snapshot }: { page: "fleet" | "board"; snapshot: FleetSnapshot }) {
+function ExampleDashboard({ page, snapshot }: { page: "fleet" | "board" | "bots"; snapshot: FleetSnapshot }) {
   const model = useMemo(() => {
     const state = planSnapshot(emptyState(), snapshot, { now: snapshot.generatedAt, replace: true });
     return rowsToView(state, currentIstDay());
@@ -28,7 +28,7 @@ function ExampleDashboard({ page, snapshot }: { page: "fleet" | "board"; snapsho
   return <Dashboard page={page} model={model} mode="example" />;
 }
 
-function LiveDashboard({ page }: { page: "fleet" | "board" }) {
+function LiveDashboard({ page }: { page: "fleet" | "board" | "bots" }) {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const workspaces = useQuery(api.workspaces.list, isAuthenticated ? {} : "skip");
   const createWorkspace = useMutation(api.workspaces.create);
@@ -37,6 +37,9 @@ function LiveDashboard({ page }: { page: "fleet" | "board" }) {
   const selected = activeWorkspace(workspaces, workspaceId);
   const model = useQuery(api.fleet.overview, selected ? { workspaceId: selected, now: currentIstDay() } : "skip");
   const pull = useAction(api.sync.pull);
+  const approve = useMutation(api.board.approve);
+  const answer = useMutation(api.board.answer);
+  const queue = useMutation(api.board.queue);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string>();
 
@@ -78,5 +81,26 @@ function LiveDashboard({ page }: { page: "fleet" | "board" }) {
     );
   }
   if (model === undefined) return <Shell current={page}><p className="p-6 text-sm text-muted-foreground">Loading fleet…</p></Shell>;
-  return <Dashboard page={page} model={model} mode="live" onSync={onSync} syncing={syncing} syncMessage={syncMessage} />;
+  return (
+    <Dashboard
+      page={page}
+      model={model}
+      mode="live"
+      onSync={onSync}
+      syncing={syncing}
+      syncMessage={syncMessage}
+      onApprove={(key) => {
+        if (!selected) return;
+        void approve({ workspaceId: selected, key }).catch(() => setSyncMessage("Could not approve that task"));
+      }}
+      onAnswer={(key, value) => {
+        if (!selected) return;
+        void answer({ workspaceId: selected, key, answer: value }).catch(() => setSyncMessage("Could not save that answer"));
+      }}
+      onQueue={(body) => {
+        if (!selected) return;
+        void queue({ workspaceId: selected, body }).catch(() => setSyncMessage("Could not queue that instruction"));
+      }}
+    />
+  );
 }

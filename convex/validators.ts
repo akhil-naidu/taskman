@@ -1,6 +1,14 @@
 import { v } from "convex/values";
 
-export const taskStatus = v.union(v.literal("waiting"), v.literal("todo"), v.literal("in_progress"), v.literal("done"));
+export const taskStatus = v.union(
+  v.literal("waiting"),
+  v.literal("todo"),
+  v.literal("in_progress"),
+  v.literal("done"),
+  v.literal("backlog"),
+  v.literal("approved"),
+  v.literal("waiting_human"),
+);
 export const urgency = v.union(v.literal("high"), v.literal("normal"));
 export const syncProvider = v.union(v.literal("clickup"), v.literal("github"), v.literal("linear"), v.literal("jira"));
 
@@ -77,6 +85,9 @@ const botView = v.object({
   notes: v.array(v.string()),
   status: v.union(v.literal("waiting"), v.literal("active"), v.literal("routine"), v.literal("on-demand")),
   currentWork: v.string(),
+  heartbeatStatus: v.string(),
+  lastHeartbeatAt: v.number(),
+  currentTask: v.string(),
 });
 
 const taskView = v.object({
@@ -93,12 +104,28 @@ const taskView = v.object({
   sourceKey: v.string(),
   externalUrl: v.optional(v.string()),
   addedDate: v.optional(v.string()),
+  needsHuman: v.boolean(),
+  question: v.string(),
+  options: v.array(v.string()),
+  progress: v.array(v.string()),
+  decision: v.string(),
 });
 
 export const fleetViewValidator = v.object({
   generatedAt: v.number(),
   bots: v.array(botView),
   tasks: v.array(taskView),
+  instructions: v.array(
+    v.object({
+      key: v.string(),
+      botKey: v.string(),
+      taskKey: v.string(),
+      kind: v.union(v.literal("instruction"), v.literal("decision")),
+      body: v.string(),
+      answer: v.string(),
+      status: v.union(v.literal("pending"), v.literal("acked")),
+    }),
+  ),
   tiles: v.object({
     bots: v.number(),
     orgs: v.number(),

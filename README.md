@@ -101,13 +101,22 @@ Lists are capped (200 bots, 500 tasks). An ingest that would pass the cap fails 
 
 ## Grok Bot connector
 
-TaskMan is a remote MCP server. Add it to a Grok Bot as a connector.
+TaskMan is a remote MCP server. Add it to a Grok Bot as a custom remote MCP server. The connection is for the human's account. xAI discovers OAuth from the URL. There is no separate Grok sign-in. The consent page uses TaskMan email and password, then the human picks a workspace.
 
-- Path: `https://<deployment>.convex.site/mcp`
+- Path: `https://<your-app-origin>/api/mcp`
 - Transport: streamable HTTP
-- Header: `Authorization: Bearer <workspace source token>`
+- Auth: OAuth 2.1 authorization code with PKCE. Do not paste a personal token.
+- Discovery: `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`
+- `GET /api/mcp` returns 405. The server answers one JSON-RPC message and does not keep a session.
 
-Create the token on the Connections page of the workspace the bot should see. Leave write off for a read-only connector. The read tools are `list_bots`, `get_bot`, `list_tasks`, `get_task`, `list_waiting_on_owner`, and `list_conflicts`. A token with the write grant can also call `claim_task`, `update_task_status`, and `report_bot_status`. Every tool uses that token's workspace only. `GET /mcp` returns 405. The server answers one JSON-RPC message and does not keep a session.
+The Connect page shows that URL and a prompt to paste for a Grok Bot user.
+
+A workspace ingest token from Connections is the other credential. Send it as `Authorization: Bearer <workspace source token>`.
+
+- That token works on `POST /api/mcp`.
+- It also works on the Convex HTTP path `POST https://<deployment>.convex.site/mcp`.
+
+Both paths use the same tools and the same workspace. Convex `POST /mcp` does not start OAuth. Leave write off on the Connections token for a read-only connector. Read tools include `list_bots`, `get_bot`, `list_tasks`, `get_task`, `list_board`, `list_waiting_on_owner`, `list_conflicts`, and `get_pending_instructions`. A write grant or the `board:write` scope can also call `register_bot`, `heartbeat`, `create_task`, `update_task`, `report_progress`, `complete_task`, `claim_task`, `update_task_status`, `report_bot_status`, and `ack_instruction`. Every tool uses that token's workspace only.
 
 ## Sync
 

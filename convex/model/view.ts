@@ -28,6 +28,11 @@ function taskView(task: TaskRow): TaskView {
     sourceKey: task.sourceKey,
     ...(task.externalUrl ? { externalUrl: task.externalUrl } : {}),
     ...(task.addedDate ? { addedDate: task.addedDate } : {}),
+    needsHuman: task.needsHuman === true,
+    question: task.question ?? "",
+    options: task.options ?? [],
+    progress: task.progress ?? [],
+    decision: task.decision ?? "",
   };
 }
 
@@ -61,6 +66,9 @@ export function rowsToView(state: FleetState, now: number, truncated = false): F
       notes: bot.notes,
       status: bot.reportedStatus ?? deriveStatus(bot, routines.length, today),
       currentWork: current?.title || bot.openItems[0] || "—",
+      heartbeatStatus: bot.heartbeatStatus ?? "",
+      lastHeartbeatAt: bot.lastHeartbeatAt ?? 0,
+      currentTask: bot.currentTaskText || current?.title || "",
     };
   });
   bots.sort((a, b) => (a.org < b.org ? -1 : a.org > b.org ? 1 : a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
@@ -69,6 +77,15 @@ export function rowsToView(state: FleetState, now: number, truncated = false): F
     generatedAt: state.ingestRuns.find((run) => run.key === "latest")?.receivedAt ?? now,
     bots,
     tasks,
+    instructions: (state.instructions ?? []).map((item) => ({
+      key: item.key,
+      botKey: item.botKey,
+      taskKey: item.taskKey,
+      kind: item.kind,
+      body: item.body,
+      answer: item.answer,
+      status: item.status,
+    })),
     tiles: {
       bots: bots.length,
       orgs: new Set(bots.map((bot) => bot.org)).size,
