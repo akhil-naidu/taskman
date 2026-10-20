@@ -20,6 +20,35 @@ pnpm build
 pnpm start
 ```
 
+## Dev deployment
+
+The shared dev deployment is `dev:courteous-chicken-605` (project `taskman`, team `mobile`).
+
+| Surface | URL |
+| --- | --- |
+| Queries and the browser client | `https://courteous-chicken-605.convex.cloud` |
+| HTTP actions | `https://courteous-chicken-605.convex.site` |
+| Ingest | `https://courteous-chicken-605.convex.site/ingest` |
+
+For the Next.js process, set `NEXT_PUBLIC_CONVEX_URL` to the `.convex.cloud` URL and `TASKMAN_INGEST_URL` to the ingest URL. Keep `CONVEX_DEPLOY_KEY` and `TASKMAN_INGEST_TOKEN` in the environment or a host secret store. Do not commit either value.
+
+Push schema and functions to that dev deployment with a dev deploy key:
+
+```bash
+CONVEX_DEPLOY_KEY='<dev deploy key>' npx convex dev --once
+```
+
+`npx convex deploy` targets a production or preview deployment. Use `npx convex dev --once` for this dev deployment.
+
+Set Convex environment variables on the same deployment. The key selects the deployment, so these commands do not need `--prod`:
+
+```bash
+CONVEX_DEPLOY_KEY='<dev deploy key>' npx convex env set TASKMAN_INGEST_TOKEN "$TASKMAN_INGEST_TOKEN"
+CONVEX_DEPLOY_KEY='<dev deploy key>' npx convex env list --names-only
+```
+
+`TASKMAN_INGEST_TOKEN` is required for `POST /ingest`. Leave `CLICKUP_API_TOKEN` unset until a read-only ClickUp token is available; ClickUp sync reports that it is not configured and does not call ClickUp. `CLICKUP_TEAM_ID` and `CLICKUP_LIST_IDS` stay unset with it. `GITHUB_TOKEN`, `LINEAR_API_KEY`, `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN` are unused stubs and stay unset.
+
 ## Environment
 
 Names only. Put values in `.env.local` or the host's secret store. `.env.example` lists every name with an empty value.
@@ -32,7 +61,7 @@ Names only. Put values in `.env.local` or the host's secret store. `.env.example
 | `CONVEX_DEPLOY_KEY` | Convex deploy key. Not read at runtime |
 | `TASKMAN_INGEST_TOKEN` | Shared secret for ingest |
 | `TASKMAN_INGEST_URL` | Convex HTTP route, `https://<deployment>.convex.site/ingest` |
-| `CLICKUP_API_TOKEN` | Read-only ClickUp token |
+| `CLICKUP_API_TOKEN` | Read-only ClickUp token. Leave unset until one is available |
 | `CLICKUP_TEAM_ID` | ClickUp workspace id |
 | `CLICKUP_LIST_IDS` | Comma-separated ClickUp list ids |
 | `GITHUB_TOKEN` | Reserved. Unused |
