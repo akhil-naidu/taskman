@@ -179,6 +179,65 @@ describe("mcp", () => {
     expect(denied.nextState).toBeNull();
   });
 
+  it("stores an onboarding profile on bot-a and imports tasks without duplicates", () => {
+    const registered = call(
+      "register_bot",
+      {
+        name: "bot-a",
+        role: "worker",
+        description: "Keeps the lane",
+        routines: ["sweep"],
+        open_work: ["Hold the lane"],
+        waiting_on_human: ["Pick a color"],
+        memories: ["Prefer short notes"],
+      },
+      write,
+      emptyState(),
+    );
+    const botRow = registered.nextState?.bots[0];
+    expect(botRow?.description).toBe("Keeps the lane");
+    expect(botRow?.openItems).toEqual(["Hold the lane"]);
+    expect(botRow?.notes).toEqual(["memory: Prefer short notes", "waiting: Pick a color"]);
+    expect(registered.nextState?.bots).toHaveLength(1);
+    const renamed = call("register_bot", { name: "bot-a", role: "editor" }, write, registered.nextState ?? emptyState());
+    expect(renamed.nextState?.bots).toHaveLength(1);
+    expect(renamed.nextState?.bots[0]?.role).toBe("editor");
+    expect(renamed.nextState?.bots[0]?.description).toBe("Keeps the lane");
+    const imported = call(
+      "bulk_import_tasks",
+      {
+        tasks: [
+          { title: "Hold the lane", owner: "bot-a", status: "backlog" },
+          { title: "Write the note", owner: "bot-a", status: "In progress", org: "fleet" },
+          { title: "Missing owner", owner: "bot-b", status: "backlog" },
+        ],
+      },
+      write,
+      renamed.nextState ?? emptyState(),
+    );
+    expect(imported.nextState?.tasks).toHaveLength(2);
+    expect(imported.nextState?.tasks.map((item) => item.ownerBotKey)).toEqual(["bot-a", "bot-a"]);
+    expect(payload(imported).data.skipped).toEqual([{ title: "Missing owner", owner: "bot-b", reason: "Owner was skipped" }]);
+    const again = call(
+      "bulk_import_tasks",
+      { tasks: [{ title: "Hold the lane", owner: "bot-a", status: "done" }] },
+      write,
+      imported.nextState ?? emptyState(),
+    );
+    expect(again.nextState?.tasks).toHaveLength(2);
+    expect(again.nextState?.tasks.find((item) => item.title === "Hold the lane")?.status).toBe("done");
+    const denied = call("bulk_import_tasks", { tasks: [{ title: "Nope", owner: "bot-a" }] }, read, again.nextState ?? emptyState());
+    expect(denied.httpStatus).toBe(403);
+    expect(denied.nextState).toBeNull();
+    const full = fleet(
+      [bot("bot-a", "Bot A", "fleet")],
+      Array.from({ length: 500 }, (_, index) => task({ key: `filled-${index}` })),
+    );
+    const capped = call("bulk_import_tasks", { tasks: [{ title: "One more", owner: "bot-a", status: "backlog" }] }, write, full);
+    expect(capped.nextState).toBeNull();
+    expect(payload(capped).text).toBe("Task cap exceeded");
+  });
+
   it("rejects bot-b when bot-a already owns the task and starts an approved claim", () => {
     const both = fleet(
       [bot("bot-a", "Bot A", "fleet"), bot("bot-b", "Bot B", "fleet")],

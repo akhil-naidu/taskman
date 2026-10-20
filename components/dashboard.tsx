@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Shell } from "@/components/shell";
+import { TaskTable } from "@/components/task-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatIst } from "@/convex/model/clock";
@@ -68,7 +69,7 @@ export function Dashboard({
 
   return (
     <Shell current={page}>
-      <main className="mx-auto w-full max-w-6xl px-4 py-5 md:px-8 md:py-6">
+      <main className="mx-auto w-full px-3 py-4 md:px-5">
         <header className="mb-4 flex flex-col gap-3">
           <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <div className="min-w-0">
@@ -82,7 +83,7 @@ export function Dashboard({
                     Board
                   </Button>
                   <Button type="button" size="sm" variant={view === "list" ? "secondary" : "outline"} aria-pressed={view === "list"} onClick={() => chooseView("list")}>
-                    List
+                    Table
                   </Button>
                 </div>
               ) : null}
@@ -236,7 +237,7 @@ function BoardPage({
       ) : null}
       <DecisionInbox tasks={tasks} onAnswer={onAnswer} />
       <QueueForm onQueue={onQueue} />
-      {view === "list" ? <TaskList tasks={tasks} /> : <TaskColumns tasks={tasks} onApprove={onApprove} />}
+      {view === "list" ? <TaskTable tasks={tasks} /> : <TaskColumns tasks={tasks} onApprove={onApprove} />}
     </>
   );
 }
@@ -262,40 +263,6 @@ function TaskColumns({ tasks, onApprove }: { tasks: TaskView[]; onApprove?: (key
           );
         })}
       </div>
-  );
-}
-
-function TaskList({ tasks }: { tasks: TaskView[] }) {
-  if (tasks.length === 0) {
-    return <p className="rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">Nothing here</p>;
-  }
-  return (
-    <div className="overflow-hidden rounded-md border border-border">
-      <table className="w-full text-left text-sm">
-        <thead className="border-b border-border text-xs text-muted-foreground">
-          <tr>
-            <th className="px-3 py-2 font-medium">Task</th>
-            <th className="px-3 py-2 font-medium">Status</th>
-            <th className="px-3 py-2 font-medium">Owner</th>
-            <th className="px-3 py-2 font-medium">Org</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tasks.map((task) => (
-            <tr key={task.key} className="border-b border-border last:border-b-0">
-              <td className="px-3 py-2">
-                <span className="mr-2 inline-block size-2 rounded-sm align-middle" style={{ background: task.orgColor }} />
-                {task.title}
-                {task.conflict ? <span className="ml-2 text-[10px] tracking-wide text-[var(--hi)] uppercase">Conflict</span> : null}
-              </td>
-              <td className="px-3 py-2 text-muted-foreground">{columnLabel(boardColumn(task))}</td>
-              <td className="px-3 py-2">{task.ownerLabel}</td>
-              <td className="px-3 py-2">{task.org}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }
 
@@ -471,10 +438,6 @@ function QueueForm({ onQueue }: { onQueue?: (body: string) => void }) {
       </Button>
     </form>
   );
-}
-
-function columnLabel(id: string) {
-  return BOARD_COLUMNS.find((column) => column[0] === id)?.[1] ?? id;
 }
 
 function WaitingGroup({ group }: { group: { owner: string; tasks: TaskView[] } }) {
