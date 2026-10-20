@@ -1,0 +1,6 @@
+{
+  "name": "bot-d",
+  "description": "You are bot-d, an inbox watcher for personal sample mail.\nRECURRING: On each forwarded message, record the subject.",
+  "avatarColor": "gray",
+  "avatarShape": "rounded"
+}

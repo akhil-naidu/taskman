@@ -1,0 +1,227 @@
+{
+  "generatedAt": 1792477800000,
+  "bots": [
+    {
+      "key": "bot-a",
+      "name": "bot-a",
+      "description": "You are bot-a, a release assistant for the sample fleet.\nWAKE: Weekday 09:00 IST",
+      "role": "A release assistant for the sample fleet",
+      "org": "Talleflow",
+      "orgColor": "#16a34a",
+      "avatarColor": "green",
+      "avatarShape": "rounded",
+      "wake": "Weekday 09:00 IST",
+      "routines": [
+        "Morning digest"
+      ],
+      "lastRun": "2026-10-20 09:10 IST",
+      "activity": [
+        "2026-10-18 Drafted the checklist",
+        "2026-10-19 Reviewed the queue · lane notes",
+        "2026-10-20 Published the morning note"
+      ],
+      "notes": [
+        "notes/bot-a.md"
+      ],
+      "open": []
+    },
+    {
+      "key": "bot-b",
+      "name": "bot-b",
+      "description": "Drafts sample release notes for dFlow.",
+      "role": "Drafts sample release notes for dFlow.",
+      "org": "dFlow",
+      "orgColor": "#ea580c",
+      "avatarColor": "orange",
+      "avatarShape": "circle",
+      "wake": "unknown",
+      "routines": [],
+      "lastRun": "unknown",
+      "activity": [],
+      "notes": [
+        "notes/bot-b.md"
+      ],
+      "open": [
+        "Rotate the deploy token before Friday",
+        "Draft the release notes for the mobile cut"
+      ]
+    },
+    {
+      "key": "bot-c",
+      "name": "bot-c",
+      "description": "Keeps the sample gate notes in order.",
+      "role": "Keeps the sample gate notes in order.",
+      "org": "Gatekart",
+      "orgColor": "#2563eb",
+      "avatarColor": "blue",
+      "avatarShape": "square",
+      "wake": "unknown",
+      "routines": [],
+      "lastRun": "unknown",
+      "activity": [],
+      "notes": [
+        "notes/bot-c.md"
+      ],
+      "open": []
+    },
+    {
+      "key": "bot-d",
+      "name": "bot-d",
+      "description": "You are bot-d, an inbox watcher for personal sample mail.\nRECURRING: On each forwarded message, record the subject.",
+      "role": "An inbox watcher for personal sample mail",
+      "org": "personal",
+      "orgColor": "#6b7280",
+      "avatarColor": "gray",
+      "avatarShape": "rounded",
+      "wake": "On each forwarded message, record the subject.",
+      "routines": [
+        "Inbox watch"
+      ],
+      "lastRun": "unknown",
+      "activity": [
+        "2026-10-01 Sent the weekly inbox summary"
+      ],
+      "notes": [
+        "notes/bot-d.md"
+      ],
+      "open": []
+    },
+    {
+      "key": "bot-e",
+      "name": "bot-e",
+      "description": "Coordinates example fleet chores.",
+      "role": "Example fleet coordinator for sample data",
+      "org": "fleet",
+      "orgColor": "#6b7280",
+      "avatarColor": "slate",
+      "avatarShape": "hex",
+      "wake": "unknown",
+      "routines": [],
+      "lastRun": "unknown",
+      "activity": [],
+      "notes": [
+        "notes/bot-e.md"
+      ],
+      "open": [
+        "Rotate the shared deploy token"
+      ]
+    }
+  ],
+  "waiting": [
+    {
+      "title": "Review the staging checklist",
+      "owner": "bot-a",
+      "date": "2026-10-18",
+      "source": "pending.md",
+      "urgency": "normal",
+      "conflict": false,
+      "claimantKeys": [
+        "bot-a"
+      ],
+      "clusterId": "text:checklist review staging"
+    },
+    {
+      "title": "Rotate the deploy token before Friday",
+      "owner": "bot-b",
+      "date": "2026-10-20",
+      "source": "pending.md",
+      "urgency": "high",
+      "conflict": true,
+      "claimantKeys": [
+        "bot-b",
+        "bot-e"
+      ],
+      "clusterId": "text:before deploy friday rotate token"
+    },
+    {
+      "title": "Ship the onboarding draft",
+      "owner": "bot-d",
+      "date": "2026-10-19",
+      "source": "pending.md",
+      "urgency": "normal",
+      "conflict": false,
+      "claimantKeys": [
+        "bot-d"
+      ],
+      "clusterId": "text:draft onboarding ship"
+    },
+    {
+      "title": "Draft the release notes for the mobile cut",
+      "owner": "bot-b",
+      "date": "",
+      "source": "notes",
+      "urgency": "normal",
+      "conflict": false,
+      "claimantKeys": [
+        "bot-b"
+      ],
+      "clusterId": "text:cut draft mobile note release"
+    },
+    {
+      "title": "Rotate the shared deploy token",
+      "owner": "bot-e",
+      "date": "",
+      "source": "notes",
+      "urgency": "high",
+      "conflict": true,
+      "claimantKeys": [
+        "bot-b",
+        "bot-e"
+      ],
+      "clusterId": "text:before deploy friday rotate token"
+    }
+  ],
+  "tasks": [
+    {
+      "key": "board-weekly-note",
+      "title": "Prepare the weekly fleet note",
+      "status": "in_progress",
+      "owner": "bot-a",
+      "org": "Talleflow",
+      "urgency": "normal",
+      "claimants": [],
+      "source": "fleet",
+      "externalId": "",
+      "url": ""
+    },
+    {
+      "key": "board-archive",
+      "title": "Archive last month's notes",
+      "status": "done",
+      "owner": "bot-c",
+      "org": "Gatekart",
+      "urgency": "normal",
+      "claimants": [],
+      "source": "fleet",
+      "externalId": "",
+      "url": ""
+    },
+    {
+      "key": "clickup:cu-1001",
+      "title": "Sample imported ticket",
+      "status": "todo",
+      "owner": "bot-b",
+      "org": "dFlow",
+      "urgency": "normal",
+      "claimants": [],
+      "source": "clickup",
+      "externalId": "cu-1001",
+      "url": "https://example.com/tasks/cu-1001"
+    },
+    {
+      "key": "board-shared-checklist",
+      "title": "Refresh the shared release checklist",
+      "status": "in_progress",
+      "owner": "bot-a",
+      "org": "Talleflow",
+      "urgency": "normal",
+      "claimants": [
+        "bot-a",
+        "bot-d"
+      ],
+      "source": "fleet",
+      "externalId": "",
+      "url": ""
+    }
+  ]
+}

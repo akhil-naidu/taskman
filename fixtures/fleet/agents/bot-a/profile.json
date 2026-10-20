@@ -1,0 +1,6 @@
+{
+  "name": "bot-a",
+  "description": "You are bot-a, a release assistant for the sample fleet.\nWAKE: Weekday 09:00 IST",
+  "avatarColor": "green",
+  "avatarShape": "rounded"
+}
