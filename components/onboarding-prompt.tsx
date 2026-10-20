@@ -56,8 +56,8 @@ function OnboardingDialog() {
     >
       <DialogContent className="sm:max-w-xl" showCloseButton>
         <DialogHeader>
-          <DialogTitle>Connect a Grok Bot</DialogTitle>
-          <DialogDescription>Paste this prompt into the bot. You can open it again from Connect.</DialogDescription>
+          <DialogTitle>Set up the orchestrator</DialogTitle>
+          <DialogDescription>Paste this prompt into the bot that should orchestrate the others. You can open it again from Connect.</DialogDescription>
         </DialogHeader>
         <McpSetupPrompt id="onboarding-mcp-prompt" />
         <DialogFooter>

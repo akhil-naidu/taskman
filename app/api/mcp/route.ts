@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   }
   const tokenHash = await sha256Hex(raw);
   const dispatched = await convex.mutation(api.mcp.dispatch, { tokenHash, message });
-  return pack(request, { httpStatus: dispatched.httpStatus, body: dispatched.body, nextState: null }, origin);
+  return pack(request, { httpStatus: dispatched.httpStatus, body: dispatched.body, nextState: null, webhookUpdates: [] }, origin);
 }
 
 function pack(request: Request, outcome: McpOutcome, origin: string) {

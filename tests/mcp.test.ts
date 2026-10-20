@@ -67,6 +67,10 @@ function payload(outcome: ReturnType<typeof handleMcpMessage>) {
   return { text, isError: result?.isError === true, data: text.startsWith("{") || text.startsWith("[") ? JSON.parse(text) : text };
 }
 
+function structured(outcome: ReturnType<typeof handleMcpMessage>) {
+  return (outcome.body?.result as { structuredContent?: unknown } | undefined)?.structuredContent;
+}
+
 describe("mcp", () => {
   const workspaceA = fleet(
     [bot("bot-a", "Bot A", "fleet")],
@@ -83,15 +87,15 @@ describe("mcp", () => {
 
   it("lists only the token workspace", () => {
     const listed = payload(call("list_bots", { workspaceId: "other" }, read, workspaceA));
-    expect(listed.data.map((item: { key: string }) => item.key)).toEqual(["bot-a"]);
+    expect(listed.data.bots.map((item: { key: string }) => item.key)).toEqual(["bot-a"]);
     const other = payload(call("list_bots", {}, read, workspaceB));
-    expect(other.data.map((item: { key: string }) => item.key)).toEqual(["bot-b"]);
+    expect(other.data.bots.map((item: { key: string }) => item.key)).toEqual(["bot-b"]);
   });
 
   it("filters tasks and reports an unknown bot", () => {
     const tasks = payload(call("list_tasks", { org: "fleet", owner: "bot-a", status: "waiting" }, read, workspaceA));
-    expect(tasks.data).toHaveLength(1);
-    expect(tasks.data[0].owner).toBe("bot-a");
+    expect(tasks.data.tasks).toHaveLength(1);
+    expect(tasks.data.tasks[0].owner).toBe("bot-a");
     const missed = payload(call("get_bot", { key: "missing" }, read, workspaceA));
     expect(missed.text).toBe("Bot was not found");
   });
@@ -113,7 +117,7 @@ describe("mcp", () => {
     expect(claimed.nextState?.tasks[0]?.ownerBotKey).toBe("bot-a");
     expect(claimed.nextState?.tasks[0]?.conflict).toBe(true);
     const conflicts = payload(call("list_conflicts", {}, read, claimed.nextState ?? both));
-    expect(conflicts.data.map((item: { key: string }) => item.key)).toEqual(["task-1"]);
+    expect(conflicts.data.tasks.map((item: { key: string }) => item.key)).toEqual(["task-1"]);
   });
 
   it("assigns an unowned task and updates status without dropping fields", () => {
@@ -256,11 +260,23 @@ describe("mcp", () => {
     const state = fleet([bot("bot-a", "Bot A", "fleet")], [task({ key: "task-3", ownerBotKey: "bot-a", ownerLabel: "Bot A", needsHuman: true, question: "Ship it?" })]);
     const answered = answerDecision(state, "task-3", "yes", 10);
     const pending = payload(call("get_pending_instructions", { bot: "bot-a" }, read, answered.state));
-    expect(pending.data).toHaveLength(1);
-    expect(pending.data[0].answer).toBe("yes");
-    const acked = call("ack_instruction", { key: pending.data[0].key }, write, answered.state);
+    expect(Array.isArray(structured(call("get_pending_instructions", { bot: "bot-a" }, read, answered.state)))).toBe(false);
+    expect(pending.data.instructions).toHaveLength(1);
+    expect(pending.data.instructions[0].answer).toBe("yes");
+    const acked = call("ack_instruction", { key: pending.data.instructions[0].key }, write, answered.state);
     const later = payload(call("get_pending_instructions", { bot: "bot-a" }, read, acked.nextState ?? answered.state));
-    expect(later.data).toHaveLength(0);
+    expect(later.data.instructions).toHaveLength(0);
+  });
+
+  it("returns object structured content for every list tool", () => {
+    const names = ["list_bots", "list_tasks", "list_waiting_on_owner", "list_conflicts", "list_board", "get_pending_instructions", "list_undelivered", "get_bot_setup_instructions"];
+    for (const name of names) {
+      const content = structured(call(name, { bot: "bot-a" }, read, workspaceA));
+      expect(Array.isArray(content)).toBe(false);
+      expect(content).toEqual(expect.any(Object));
+    }
+    const pending = structured(call("get_pending_instructions", { bot: "bot-a" }, read, workspaceA)) as { instructions: unknown };
+    expect(Array.isArray(pending.instructions)).toBe(true);
   });
 
   it("checks origin and protocol version", () => {

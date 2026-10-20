@@ -69,6 +69,10 @@ export function rowsToView(state: FleetState, now: number, truncated = false): F
       heartbeatStatus: bot.heartbeatStatus ?? "",
       lastHeartbeatAt: bot.lastHeartbeatAt ?? 0,
       currentTask: bot.currentTaskText || current?.title || "",
+      webhookConfigured: bot.webhookConfigured === true,
+      webhookLastDeliveryAt: bot.webhookLastDeliveryAt ?? 0,
+      webhookLastError: bot.webhookLastError ?? "",
+      relayStatus: bot.relayStatus ?? "",
     };
   });
   bots.sort((a, b) => (a.org < b.org ? -1 : a.org > b.org ? 1 : a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
@@ -86,6 +90,7 @@ export function rowsToView(state: FleetState, now: number, truncated = false): F
       answer: item.answer,
       status: item.status,
     })),
+    relayWaiting: (state.deliveries ?? []).filter((item) => item.status === "undelivered").length,
     tiles: {
       bots: bots.length,
       orgs: new Set(bots.map((bot) => bot.org)).size,

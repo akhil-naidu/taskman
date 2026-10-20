@@ -23,7 +23,7 @@ export function McpSetupPrompt({ id = "mcp-setup-prompt" }: { id?: string }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <Textarea id={id} readOnly value={prompt} aria-label="Setup prompt" className="min-h-52 font-mono text-xs" />
+      <Textarea id={id} readOnly value={prompt} aria-label="Setup prompt" className="min-h-80 font-mono text-xs" />
       <div>
         <Button
           type="button"

@@ -95,6 +95,10 @@ export default defineSchema({
     currentTaskKey: v.optional(v.string()),
     currentTaskText: v.optional(v.string()),
     lastHeartbeatAt: v.optional(v.number()),
+    webhookConfigured: v.optional(v.boolean()),
+    webhookLastDeliveryAt: v.optional(v.number()),
+    webhookLastError: v.optional(v.string()),
+    relayStatus: v.optional(v.union(v.literal("delivered"), v.literal("retrying"), v.literal("undelivered"), v.literal("relayed"))),
     updatedAt: v.number(),
   })
     .index("by_workspace", ["workspaceId"])
@@ -179,6 +183,35 @@ export default defineSchema({
   })
     .index("by_workspace", ["workspaceId"])
     .index("by_workspace_key", ["workspaceId", "key"]),
+  webhookDeliveries: defineTable({
+    workspaceId,
+    key: v.string(),
+    botKey: v.string(),
+    event: v.union(v.literal("decision_recorded"), v.literal("task_approved"), v.literal("instruction_added")),
+    taskKey: v.string(),
+    title: v.string(),
+    decision: v.string(),
+    boardUrl: v.string(),
+    status: v.union(v.literal("pending"), v.literal("delivered"), v.literal("undelivered"), v.literal("relayed")),
+    attempts: v.number(),
+    lastError: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    deliveredAt: v.number(),
+    relayedAt: v.number(),
+  })
+    .index("by_workspace", ["workspaceId"])
+    .index("by_workspace_key", ["workspaceId", "key"]),
+  botWebhooks: defineTable({
+    workspaceId,
+    botKey: v.string(),
+    ciphertext: v.string(),
+    iv: v.string(),
+    hint: v.string(),
+    updatedAt: v.number(),
+  })
+    .index("by_workspace", ["workspaceId"])
+    .index("by_workspace_bot", ["workspaceId", "botKey"]),
   instructions: defineTable({
     workspaceId,
     key: v.string(),

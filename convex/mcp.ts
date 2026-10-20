@@ -1,9 +1,11 @@
 import { v } from "convex/values";
-import { blankState, handleMcpMessage, methodOf, needsToken } from "./model/mcp";
+import { blankState, encryptionUnavailable, handleMcpMessage, methodOf, needsToken } from "./model/mcp";
 import type { FleetState } from "./model/types";
-import { loadState, writeState } from "./persist";
+import { newPendingKeys, sealWebhookUpdates, type SealedWebhook } from "./model/webhooks";
+import { loadState } from "./persist";
 import type { Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery, mutation } from "./_generated/server";
+import { applyCommit } from "./webhooks";
 
 export const load = internalQuery({
   args: { workspaceId: v.id("workspaces") },
@@ -16,7 +18,7 @@ export const load = internalQuery({
 export const save = internalMutation({
   args: { workspaceId: v.id("workspaces"), state: v.any() },
   handler: async (ctx, args): Promise<null> => {
-    await writeState(ctx, args.workspaceId, args.state as FleetState);
+    await applyCommit(ctx, { workspaceId: args.workspaceId, state: args.state as FleetState, sealed: [], deliveryKeys: [] });
     return null;
   },
 });
@@ -55,7 +57,25 @@ export const dispatch = mutation({
     }
     const { state } = await loadState(ctx, workspaceId);
     const outcome = handleMcpMessage(args.message, token, state, now);
-    if (outcome.nextState) await writeState(ctx, workspaceId, outcome.nextState);
-    return { httpStatus: outcome.httpStatus, body: outcome.body };
+    const committed = await commitOutcome(outcome, process.env.TASKMAN_ENCRYPTION_KEY);
+    if (committed.refused) return { httpStatus: committed.outcome.httpStatus, body: committed.outcome.body };
+    if (committed.outcome.nextState || committed.sealed.length > 0) {
+      await applyCommit(ctx, {
+        workspaceId,
+        state: committed.outcome.nextState,
+        sealed: committed.sealed,
+        deliveryKeys: committed.outcome.nextState ? newPendingKeys(state, committed.outcome.nextState) : [],
+      });
+    }
+    return { httpStatus: committed.outcome.httpStatus, body: committed.outcome.body };
   },
 });
+
+async function commitOutcome(
+  outcome: ReturnType<typeof handleMcpMessage>,
+  material: string | undefined,
+): Promise<{ refused: boolean; outcome: ReturnType<typeof handleMcpMessage>; sealed: SealedWebhook[] }> {
+  if (outcome.webhookUpdates.length === 0) return { refused: false, outcome, sealed: [] };
+  if (!material) return { refused: true, outcome: encryptionUnavailable(outcome), sealed: [] };
+  return { refused: false, outcome, sealed: await sealWebhookUpdates(outcome.webhookUpdates, material) };
+}
