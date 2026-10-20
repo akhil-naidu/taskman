@@ -19,6 +19,7 @@ const WRITE_TOOLS = new Set([
   "report_progress",
   "complete_task",
   "ack_instruction",
+  "bulk_import_tasks",
 ]);
 
 export type StoredGrant = {

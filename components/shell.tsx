@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { OnboardingPrompt } from "@/components/onboarding-prompt";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -69,10 +70,10 @@ export function Shell({ current, children }: { current: (typeof NAV)[number]["id
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground md:grid md:grid-cols-[220px_1fr]">
+    <div className="min-h-screen bg-background text-foreground md:grid md:grid-cols-[200px_minmax(0,1fr)]">
       <aside className="border-b border-border bg-sidebar text-sidebar-foreground md:sticky md:top-0 md:flex md:h-screen md:flex-col md:border-r md:border-b-0">
-        <div className="flex items-center justify-between px-3 py-3">
-          <Link href={hrefFor("fleet")} className="px-2 text-sm font-semibold tracking-tight">
+        <div className="flex items-center justify-between px-2 py-2">
+          <Link href={hrefFor("fleet")} className="px-2 text-[13px] font-semibold tracking-tight">
             taskman
           </Link>
           <Button type="button" variant="outline" size="xs" onClick={() => setOpen(true)} aria-keyshortcuts="Control+K Meta+K">
@@ -88,7 +89,7 @@ export function Shell({ current, children }: { current: (typeof NAV)[number]["id
                 key={item.id}
                 href={hrefFor(item.id)}
                 aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-muted-foreground hover:bg-sidebar-accent/60"}`}
+                className={`flex items-center gap-2 rounded-md px-2 py-1 text-[13px] ${active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-muted-foreground hover:bg-sidebar-accent/60"}`}
               >
                 <Icon className="size-4" />
                 {item.label}
@@ -98,7 +99,10 @@ export function Shell({ current, children }: { current: (typeof NAV)[number]["id
         </nav>
         <div className="mt-auto border-t border-sidebar-border px-3 py-3">{process.env.NEXT_PUBLIC_CONVEX_URL ? <WorkspaceSwitcher /> : <p className="px-2 text-xs text-muted-foreground">Example snapshot</p>}</div>
       </aside>
-      <div className="min-w-0">{children}</div>
+      <div className="min-w-0">
+        {children}
+        <OnboardingPrompt />
+      </div>
       <CommandDialog open={open} onOpenChange={setOpen} title="Command palette" description="Jump to a page">
         <Command>
           <CommandInput placeholder="Jump to…" />
@@ -111,8 +115,8 @@ export function Shell({ current, children }: { current: (typeof NAV)[number]["id
               <CommandItem value="board" onSelect={() => go(hrefFor("board"))}>
                 Board
               </CommandItem>
-              <CommandItem value="board list" onSelect={() => go(hrefFor("board", "list"))}>
-                Board list
+              <CommandItem value="board table" onSelect={() => go(hrefFor("board", "list"))}>
+                Board table
               </CommandItem>
               <CommandItem value="bots" onSelect={() => go(hrefFor("bots"))}>
                 Bots

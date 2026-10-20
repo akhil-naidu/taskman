@@ -3,10 +3,10 @@ import type { Metadata } from "next";
 import { Suspense, type ReactNode } from "react";
 import { ClientProvider } from "@/components/client-provider";
 import "./globals.css";
-import { Geist } from "next/font/google";
+import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
 export const metadata: Metadata = {
   title: "taskman",
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" data-theme="dark" className={cn("dark h-full antialiased", "font-sans", geist.variable)} suppressHydrationWarning>
+    <html lang="en" data-theme="dark" className={cn("dark h-full antialiased", "font-sans", inter.variable)} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -33,7 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
 }
 
 async function AuthShell({ children }: { children: ReactNode }) {
-  const tree = <ClientProvider>{children}</ClientProvider>;
+  const tree = <ClientProvider siteUrl={process.env.SITE_URL ?? ""}>{children}</ClientProvider>;
   if (!process.env.NEXT_PUBLIC_CONVEX_URL) return tree;
   return <ConvexAuthNextjsServerProvider>{tree}</ConvexAuthNextjsServerProvider>;
 }

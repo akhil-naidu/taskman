@@ -109,14 +109,16 @@ TaskMan is a remote MCP server. Add it to a Grok Bot as a custom remote MCP serv
 - Discovery: `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`
 - `GET /api/mcp` returns 405. The server answers one JSON-RPC message and does not keep a session.
 
-The Connect page shows that URL and a prompt to paste for a Grok Bot user.
+The Connect page shows that URL and a prompt to paste for a Grok Bot user. The same prompt opens the first time a signed-in member enters a workspace in this browser. Dismissing it hides it for that workspace until the browser data is cleared. Connect keeps the prompt. The URL in the prompt is `SITE_URL` plus `/api/mcp` (the origin of the app you have open when `SITE_URL` is unset).
+
+The prompt tells the bot to add the remote server with OAuth, then call `register_bot` once (name, role, description, routines, open work, items waiting on the human, and memories it chooses to share) and `bulk_import_tasks` to log current tasks. After that it should keep logging tasks and progress. Sign-in on the consent page is email and password. There is no other sign-in provider.
 
 A workspace ingest token from Connections is the other credential. Send it as `Authorization: Bearer <workspace source token>`.
 
 - That token works on `POST /api/mcp`.
 - It also works on the Convex HTTP path `POST https://<deployment>.convex.site/mcp`.
 
-Both paths use the same tools and the same workspace. Convex `POST /mcp` does not start OAuth. Leave write off on the Connections token for a read-only connector. Read tools include `list_bots`, `get_bot`, `list_tasks`, `get_task`, `list_board`, `list_waiting_on_owner`, `list_conflicts`, and `get_pending_instructions`. A write grant or the `board:write` scope can also call `register_bot`, `heartbeat`, `create_task`, `update_task`, `report_progress`, `complete_task`, `claim_task`, `update_task_status`, `report_bot_status`, and `ack_instruction`. Every tool uses that token's workspace only.
+Both paths use the same tools and the same workspace. Convex `POST /mcp` does not start OAuth. Leave write off on the Connections token for a read-only connector. Read tools include `list_bots`, `get_bot`, `list_tasks`, `get_task`, `list_board`, `list_waiting_on_owner`, `list_conflicts`, and `get_pending_instructions`. A write grant or the `board:write` scope can also call `register_bot`, `bulk_import_tasks`, `heartbeat`, `create_task`, `update_task`, `report_progress`, `complete_task`, `claim_task`, `update_task_status`, `report_bot_status`, and `ack_instruction`. `register_bot` updates one bot in place. `bulk_import_tasks` adds or updates tasks for bots that already exist; the same owner and title updates that task instead of adding another. An owner that is not in the workspace is skipped. Every tool uses that token's workspace only.
 
 ## Sync
 

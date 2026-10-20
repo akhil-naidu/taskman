@@ -1,8 +1,9 @@
+import { LIMITS } from "../persist";
 import { boardColumn } from "./columns";
 import { isWriteTool } from "./oauth";
 import { botKey, orgColor, orgSlug } from "./orgs";
 import { emptyState } from "./store";
-import { stableHash } from "./text";
+import { stableHash, urgencyFor } from "./text";
 import type { BotRow, BotStatus, FleetState, TaskRow, TaskStatus } from "./types";
 import { TASK_STATUSES } from "./types";
 import { rowsToView } from "./view";
@@ -152,6 +153,7 @@ function applyWrite(name: string, args: Record<string, unknown>, state: FleetSta
   if (name === "report_progress") return reportProgress(args, state, now);
   if (name === "complete_task") return completeTask(args, state, now);
   if (name === "ack_instruction") return ackInstruction(args, state, now);
+  if (name === "bulk_import_tasks") return bulkImportTasks(args, state, now);
   return { result: missing("Tool was not found"), nextState: null };
 }
 
@@ -203,19 +205,47 @@ function reportBotStatus(args: Record<string, unknown>, state: FleetState, now: 
   return { result: result({ key, status }), nextState: next };
 }
 
+const MEMORY_PREFIX = "memory: ";
+const WAITING_PREFIX = "waiting: ";
+
+function tagged(prefix: string, items: string[]): string[] {
+  return items.map((item) => `${prefix}${item}`);
+}
+
+function untagged(notes: string[], prefix: string): string[] {
+  return notes.filter((note) => note.startsWith(prefix)).map((note) => note.slice(prefix.length));
+}
+
+function optionalList(args: Record<string, unknown>, keys: string[]): string[] | null {
+  const key = keys.find((item) => item in args);
+  if (!key) return null;
+  return stringList(args[key]);
+}
+
 function registerBot(args: Record<string, unknown>, state: FleetState, now: number): { result: ToolResult; nextState: FleetState | null } {
   const name = stringArg(args, "name").trim();
   const role = stringArg(args, "role").trim();
   const org = (stringArg(args, "org") || stringArg(args, "area") || "fleet").trim();
   const wake = (stringArg(args, "wake") || stringArg(args, "wake_schedule") || "unspecified").trim();
-  const routines = stringList(args.routines);
   if (!name || !role) return { result: missing("Name and role are required"), nextState: null };
   const key = botKey(name);
   const existing = state.bots.find((item) => item.key === key);
+  const openWork = optionalList(args, ["open_work", "openWork"]);
+  const waiting = optionalList(args, ["waiting_on_human", "waitingOnHuman"]);
+  const memories = optionalList(args, ["memories", "learnings"]);
+  const previousNotes = existing?.notes ?? [];
+  const keptNotes = previousNotes.filter((note) => !note.startsWith(MEMORY_PREFIX) && !note.startsWith(WAITING_PREFIX));
+  const notes = [
+    ...keptNotes,
+    ...tagged(MEMORY_PREFIX, memories ?? untagged(previousNotes, MEMORY_PREFIX)),
+    ...tagged(WAITING_PREFIX, waiting ?? untagged(previousNotes, WAITING_PREFIX)),
+  ];
+  const openItems = openWork ?? existing?.openItems ?? [];
+  const description = "description" in args ? stringArg(args, "description").trim() : (existing?.description ?? "");
   const bot: BotRow = {
     key,
     name,
-    description: existing?.description ?? "",
+    description,
     role,
     org,
     orgColor: orgColor(org),
@@ -223,10 +253,10 @@ function registerBot(args: Record<string, unknown>, state: FleetState, now: numb
     avatarShape: existing?.avatarShape ?? "circle",
     wake,
     lastRunText: existing?.lastRunText ?? "",
-    openCount: existing?.openCount ?? 0,
-    openItems: existing?.openItems ?? [],
+    openCount: openItems.length,
+    openItems,
     activity: existing?.activity ?? [],
-    notes: existing?.notes ?? [],
+    notes,
     ...(existing?.reportedStatus ? { reportedStatus: existing.reportedStatus } : {}),
     origin: "mcp",
     ...(existing?.heartbeatStatus ? { heartbeatStatus: existing.heartbeatStatus } : {}),
@@ -236,9 +266,28 @@ function registerBot(args: Record<string, unknown>, state: FleetState, now: numb
     updatedAt: now,
   };
   const bots = existing ? state.bots.map((item) => (item.key === key ? bot : item)) : [...state.bots, bot];
-  const kept = state.routines.filter((item) => item.botKey !== key);
-  const nextRoutines = routines.map((routine) => ({ key: `${key}:${routine}`, botKey: key, name: routine, updatedAt: now }));
-  return { result: result({ key, name, role, org, wake, routines }), nextState: { ...state, bots, routines: [...kept, ...nextRoutines] } };
+  const routineNames = optionalList(args, ["routines"]);
+  const kept = routineNames === null ? state.routines : state.routines.filter((item) => item.botKey !== key);
+  const nextRoutines =
+    routineNames === null
+      ? state.routines
+      : [...kept, ...routineNames.map((routine) => ({ key: `${key}:${routine}`, botKey: key, name: routine, updatedAt: now }))];
+  const routineList = nextRoutines.filter((item) => item.botKey === key).map((item) => item.name);
+  return {
+    result: result({
+      key,
+      name,
+      role,
+      description,
+      org,
+      wake,
+      routines: routineList,
+      open_work: openItems,
+      waiting_on_human: untagged(notes, WAITING_PREFIX),
+      memories: untagged(notes, MEMORY_PREFIX),
+    }),
+    nextState: { ...state, bots, routines: nextRoutines },
+  };
 }
 
 function heartbeat(args: Record<string, unknown>, state: FleetState, now: number): { result: ToolResult; nextState: FleetState | null } {
@@ -340,6 +389,108 @@ function completeTask(args: Record<string, unknown>, state: FleetState, now: num
   if (!task) return { result: missing("Task was not found"), nextState: null };
   const next = { ...task, status: "done" as const, needsHuman: false, updatedAt: now };
   return { result: result(publicTask(taskViewFromRow(next))), nextState: replaceTask(state, next) };
+}
+
+function findBot(state: FleetState, owner: string): BotRow | undefined {
+  const name = owner.trim();
+  if (!name) return undefined;
+  const key = botKey(name);
+  return state.bots.find((item) => item.key === name || item.key === key || item.name.toLowerCase() === name.toLowerCase());
+}
+
+function importStatus(value: string, needsHuman: boolean): TaskStatus | null {
+  const normalized = value.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
+  const statuses: Record<string, TaskStatus> = {
+    backlog: "backlog",
+    approved: "approved",
+    "in progress": "in_progress",
+    "waiting on human": "waiting_human",
+    done: "done",
+    waiting: "waiting",
+    todo: "todo",
+  };
+  if (!normalized) return needsHuman ? "waiting_human" : "backlog";
+  const status = statuses[normalized];
+  if (!status) return null;
+  if (needsHuman && status !== "done") return "waiting_human";
+  return status;
+}
+
+function bulkImportTasks(args: Record<string, unknown>, state: FleetState, now: number): { result: ToolResult; nextState: FleetState | null } {
+  if (!Array.isArray(args.tasks)) return { result: missing("Tasks are required"), nextState: null };
+  const skipped: { title: string; owner: string; reason: string }[] = [];
+  const planned: { key: string; isNew: boolean; task: TaskRow }[] = [];
+  const keys = new Set(state.tasks.map((item) => item.key));
+  for (const item of args.tasks) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      skipped.push({ title: "", owner: "", reason: "Task was not an object" });
+      continue;
+    }
+    const record = item as Record<string, unknown>;
+    const title = stringArg(record, "title").trim();
+    const owner = stringArg(record, "owner") || stringArg(record, "bot");
+    if (!title) {
+      skipped.push({ title: "", owner, reason: "Title is required" });
+      continue;
+    }
+    const bot = findBot(state, owner);
+    if (!bot) {
+      skipped.push({ title, owner, reason: "Owner was skipped" });
+      continue;
+    }
+    const needsHuman = boolArg(record, "needs_human");
+    const status = importStatus(stringArg(record, "status"), needsHuman);
+    if (!status) {
+      skipped.push({ title, owner: bot.key, reason: "Status was not found" });
+      continue;
+    }
+    const key = `mcp:${stableHash(`${bot.key}|${title.toLowerCase()}`)}`;
+    const existing = state.tasks.find((task) => task.key === key) ?? planned.find((task) => task.key === key)?.task;
+    const org = (stringArg(record, "org") || existing?.org || bot.org).trim();
+    const urgencyValue = stringArg(record, "urgency");
+    const urgency = urgencyValue === "high" || urgencyValue === "normal" ? urgencyValue : (existing?.urgency ?? urgencyFor(title));
+    const question = "question" in record ? stringArg(record, "question").trim() : (existing?.question ?? "");
+    const options = "options" in record ? stringList(record.options) : (existing?.options ?? []);
+    const progress = "progress" in record ? stringList(record.progress ?? record.note) : (existing?.progress ?? []);
+    const task: TaskRow = {
+      key,
+      title: title.slice(0, 500),
+      status,
+      ownerBotKey: bot.key,
+      ownerLabel: bot.name,
+      org,
+      orgColor: orgColor(org),
+      urgency,
+      claimKey: existing?.claimKey ?? key,
+      conflict: existing?.conflict ?? false,
+      claimantKeys: existing?.claimantKeys?.length ? existing.claimantKeys : [bot.key],
+      sourceKey: existing?.sourceKey || "mcp",
+      externalId: existing?.externalId ?? "",
+      externalUrl: existing?.externalUrl ?? "",
+      addedDate: existing?.addedDate ?? "",
+      needsHuman: needsHuman || status === "waiting_human",
+      question,
+      options,
+      progress,
+      decision: existing?.decision ?? "",
+      updatedAt: now,
+    };
+    const prior = planned.findIndex((entry) => entry.key === key);
+    if (prior >= 0) planned[prior] = { key, isNew: planned[prior]?.isNew ?? !keys.has(key), task };
+    else planned.push({ key, isNew: !keys.has(key), task });
+  }
+  const added = planned.filter((entry) => entry.isNew).length;
+  if (state.tasks.length + added > LIMITS.tasks) return { result: missing("Task cap exceeded"), nextState: null };
+  const byKey = new Map(state.tasks.map((task) => [task.key, task]));
+  for (const entry of planned) byKey.set(entry.key, entry.task);
+  const tasks = [...byKey.values()];
+  return {
+    result: result({
+      imported: planned.map((entry) => publicTask(taskViewFromRow(entry.task))),
+      skipped,
+    }),
+    nextState: { ...state, tasks },
+  };
 }
 
 function ackInstruction(args: Record<string, unknown>, state: FleetState, now: number): { result: ToolResult; nextState: FleetState | null } {
@@ -518,12 +669,44 @@ function toolDefinitions() {
         properties: {
           name: { type: "string" },
           role: { type: "string" },
+          description: { type: "string" },
           org: { type: "string" },
           area: { type: "string" },
           wake: { type: "string" },
           routines: { type: "array", items: { type: "string" } },
+          open_work: { type: "array", items: { type: "string" } },
+          waiting_on_human: { type: "array", items: { type: "string" } },
+          memories: { type: "array", items: { type: "string" } },
         },
         required: ["name", "role"],
+      },
+    },
+    {
+      name: "bulk_import_tasks",
+      description: "Add or update many tasks for bots already in this workspace. The same owner and title updates the existing task.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          tasks: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string" },
+                owner: { type: "string" },
+                status: { type: "string" },
+                org: { type: "string" },
+                needs_human: { type: "boolean" },
+                question: { type: "string" },
+                options: { type: "array", items: { type: "string" } },
+                urgency: { type: "string", enum: ["high", "normal"] },
+                progress: { type: "array", items: { type: "string" } },
+              },
+              required: ["title", "owner"],
+            },
+          },
+        },
+        required: ["tasks"],
       },
     },
     {
