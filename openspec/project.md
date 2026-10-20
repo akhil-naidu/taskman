@@ -1,14 +1,14 @@
 # taskman
 
-Fleet visibility, box hygiene, task ownership, and read-only tracker sync for a group of assistant bots.
+Multi-tenant fleet visibility, box hygiene, task ownership, and read-only tracker sync. Anyone can sign up, create a workspace, and run their own bots and tasks.
 
 ## Product
 
 The box outside this app stays the source of truth. A push script normalizes profiles, config, an index, notes, and waiting lists into one snapshot and upserts Convex. The hosted app never reads that machine.
 
-The board shows the fleet and the tasks those bots own. Each task has one owner, one org, and a status. Orgs are the boundary for later visibility. Hand-offs and waiting states keep history.
+The board shows the fleet and the tasks those bots own. Each task has one owner, one org, and a status. Orgs are a label inside a workspace. The tenant boundary is the workspace: a member cannot read or write another workspace. Hand-offs and waiting states keep history.
 
-Tracker sync is read-only. ClickUp can pull tasks. GitHub Issues, Linear, and Jira are reserved and do not write back.
+Tracker sync is read-only. ClickUp, Linear, GitHub, Jira, and Dropbox credentials are stored encrypted on the workspace. They are not environment variables. GitHub Issues, Linear, and Jira pulls stay reserved until those adapters are implemented. There is no write-back.
 
 Connections and the remote MCP server are specified as capabilities in `openspec/specs/` so later work has a contract. The workspace UI that registers sources and serves the MCP endpoint is a separate change.
 
