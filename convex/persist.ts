@@ -1,7 +1,9 @@
+import type { Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { FleetState } from "./model/types";
 
 type ReadCtx = Pick<QueryCtx, "db">;
+type WorkspaceId = Id<"workspaces">;
 
 export const LIMITS = {
   bots: 200,
@@ -13,13 +15,11 @@ export const LIMITS = {
   ingestRuns: 20,
 } as const;
 
-const scope = "default";
-
-function strip<T extends { _id: string; _creationTime: number; scope: string }>(doc: T) {
-  const { _id, _creationTime, scope: rowScope, ...rest } = doc;
+function strip<T extends { _id: string; _creationTime: number; workspaceId: string }>(doc: T) {
+  const { _id, _creationTime, workspaceId, ...rest } = doc;
   void _id;
   void _creationTime;
-  void rowScope;
+  void workspaceId;
   return rest;
 }
 
@@ -49,14 +49,39 @@ async function replaceByKey<Id, Row extends { key: string }>(
   }
 }
 
-export async function loadState(ctx: ReadCtx, strict = false): Promise<{ state: FleetState; truncated: boolean }> {
-  const bots = await ctx.db.query("bots").withIndex("by_scope", (q) => q.eq("scope", scope)).take(LIMITS.bots);
-  const routines = await ctx.db.query("routines").withIndex("by_scope", (q) => q.eq("scope", scope)).take(LIMITS.routines);
-  const runs = await ctx.db.query("runs").withIndex("by_scope", (q) => q.eq("scope", scope)).take(LIMITS.runs);
-  const tasks = await ctx.db.query("tasks").withIndex("by_scope", (q) => q.eq("scope", scope)).take(LIMITS.tasks);
-  const sources = await ctx.db.query("sources").withIndex("by_scope", (q) => q.eq("scope", scope)).take(LIMITS.sources);
-  const syncLinks = await ctx.db.query("syncLinks").withIndex("by_scope", (q) => q.eq("scope", scope)).take(LIMITS.syncLinks);
-  const ingestRuns = await ctx.db.query("ingestRuns").withIndex("by_scope", (q) => q.eq("scope", scope)).take(LIMITS.ingestRuns);
+export async function loadState(
+  ctx: ReadCtx,
+  workspaceId: WorkspaceId,
+  strict = false,
+): Promise<{ state: FleetState; truncated: boolean }> {
+  const bots = await ctx.db
+    .query("bots")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.bots);
+  const routines = await ctx.db
+    .query("routines")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.routines);
+  const runs = await ctx.db
+    .query("runs")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.runs);
+  const tasks = await ctx.db
+    .query("tasks")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.tasks);
+  const sources = await ctx.db
+    .query("sources")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.sources);
+  const syncLinks = await ctx.db
+    .query("syncLinks")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.syncLinks);
+  const ingestRuns = await ctx.db
+    .query("ingestRuns")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.ingestRuns);
   const truncated =
     capped(bots.length, LIMITS.bots, strict, "bots") ||
     capped(routines.length, LIMITS.routines, strict, "routines") ||
@@ -83,13 +108,13 @@ export async function loadState(ctx: ReadCtx, strict = false): Promise<{ state: 
   };
 }
 
-export async function writeState(ctx: MutationCtx, state: FleetState) {
-  const bots = state.bots.map((row) => ({ ...row, scope }));
-  const routines = state.routines.map((row) => ({ ...row, scope }));
-  const runs = state.runs.map((row) => ({ ...row, scope }));
-  const tasks = state.tasks.map((row) => ({ ...row, scope }));
-  const sources = state.sources.map((row) => ({ ...row, scope }));
-  const ingestRuns = state.ingestRuns.map((row) => ({ ...row, scope }));
+export async function writeState(ctx: MutationCtx, workspaceId: WorkspaceId, state: FleetState) {
+  const bots = state.bots.map((row) => ({ ...row, workspaceId }));
+  const routines = state.routines.map((row) => ({ ...row, workspaceId }));
+  const runs = state.runs.map((row) => ({ ...row, workspaceId }));
+  const tasks = state.tasks.map((row) => ({ ...row, workspaceId }));
+  const sources = state.sources.map((row) => ({ ...row, workspaceId }));
+  const ingestRuns = state.ingestRuns.map((row) => ({ ...row, workspaceId }));
   if (bots.length > LIMITS.bots) throw new Error("bots exceeds the ingest limit");
   if (routines.length > LIMITS.routines) throw new Error("routines exceeds the ingest limit");
   if (runs.length > LIMITS.runs) throw new Error("runs exceeds the ingest limit");
@@ -98,13 +123,34 @@ export async function writeState(ctx: MutationCtx, state: FleetState) {
   if (ingestRuns.length > LIMITS.ingestRuns) throw new Error("ingestRuns exceeds the ingest limit");
   if (state.syncLinks.length > LIMITS.syncLinks) throw new Error("syncLinks exceeds the ingest limit");
 
-  const existingBots = await ctx.db.query("bots").withIndex("by_scope", (q) => q.eq("scope", scope)).take(LIMITS.bots);
-  const existingRoutines = await ctx.db.query("routines").withIndex("by_scope", (q) => q.eq("scope", scope)).take(LIMITS.routines);
-  const existingRuns = await ctx.db.query("runs").withIndex("by_scope", (q) => q.eq("scope", scope)).take(LIMITS.runs);
-  const existingTasks = await ctx.db.query("tasks").withIndex("by_scope", (q) => q.eq("scope", scope)).take(LIMITS.tasks);
-  const existingSources = await ctx.db.query("sources").withIndex("by_scope", (q) => q.eq("scope", scope)).take(LIMITS.sources);
-  const existingIngest = await ctx.db.query("ingestRuns").withIndex("by_scope", (q) => q.eq("scope", scope)).take(LIMITS.ingestRuns);
-  const existingLinks = await ctx.db.query("syncLinks").withIndex("by_scope", (q) => q.eq("scope", scope)).take(LIMITS.syncLinks);
+  const existingBots = await ctx.db
+    .query("bots")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.bots);
+  const existingRoutines = await ctx.db
+    .query("routines")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.routines);
+  const existingRuns = await ctx.db
+    .query("runs")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.runs);
+  const existingTasks = await ctx.db
+    .query("tasks")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.tasks);
+  const existingSources = await ctx.db
+    .query("sources")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.sources);
+  const existingIngest = await ctx.db
+    .query("ingestRuns")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.ingestRuns);
+  const existingLinks = await ctx.db
+    .query("syncLinks")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.syncLinks);
   capped(existingBots.length, LIMITS.bots, true, "bots");
   capped(existingRoutines.length, LIMITS.routines, true, "routines");
   capped(existingRuns.length, LIMITS.runs, true, "runs");
@@ -146,9 +192,12 @@ export async function writeState(ctx: MutationCtx, state: FleetState) {
 
   const links = [];
   for (const link of state.syncLinks) {
-    const task = await ctx.db.query("tasks").withIndex("by_key", (q) => q.eq("key", link.taskKey)).unique();
+    const task = await ctx.db
+      .query("tasks")
+      .withIndex("by_workspace_key", (q) => q.eq("workspaceId", workspaceId).eq("key", link.taskKey))
+      .unique();
     if (!task) throw new Error(`Missing task for sync link ${link.key}`);
-    links.push({ ...link, taskId: task._id, scope });
+    links.push({ ...link, taskId: task._id, workspaceId });
   }
   await replaceByKey(existingLinks, links, {
     remove: (id) => ctx.db.delete(id),

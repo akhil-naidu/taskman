@@ -38,7 +38,7 @@ describe("sync adapters", () => {
     const missingToken = await pullClickUp({ listIds: ["list-1"], fetchImpl });
     const missingTarget = await pullClickUp({ token: "token", fetchImpl });
     expect(missingToken.tasks).toEqual([]);
-    expect(missingTarget.message).toMatch(/CLICKUP_LIST_IDS/);
+    expect(missingTarget.message).toMatch(/list id or team id/);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 

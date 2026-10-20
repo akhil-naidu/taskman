@@ -1,4 +1,6 @@
+import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import type { Metadata } from "next";
+import { ClientProvider } from "@/components/client-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -6,8 +8,8 @@ export const metadata: Metadata = {
   description: "Fleet and board for a group of assistant bots",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
-  return (
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const tree = (
     <html lang="en" data-theme="dark" className="h-full antialiased" suppressHydrationWarning>
       <head>
         <script
@@ -16,7 +18,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           }}
         />
       </head>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <ClientProvider>{children}</ClientProvider>
+      </body>
     </html>
   );
+  if (!process.env.NEXT_PUBLIC_CONVEX_URL) return tree;
+  return <ConvexAuthNextjsServerProvider>{tree}</ConvexAuthNextjsServerProvider>;
 }

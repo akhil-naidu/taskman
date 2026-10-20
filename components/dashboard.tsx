@@ -98,6 +98,11 @@ export function Dashboard({
             <Link href={`/board${orgQuery}`} className={page === "board" ? navOn : navOff}>
               Board
             </Link>
+            {mode === "live" ? (
+              <Link href="/settings" className={navOff}>
+                Settings
+              </Link>
+            ) : null}
           </nav>
           <div className="md:ml-auto flex flex-col gap-2 sm:flex-row">
             <input

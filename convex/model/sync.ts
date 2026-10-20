@@ -63,14 +63,14 @@ export async function pullClickUp(input: SyncPullInput): Promise<PullResult> {
   const listIds = (input.listIds ?? []).map((id) => id.trim()).filter(Boolean);
   const teamId = input.teamId?.trim() ?? "";
   if (!input.token) {
-    return { provider: "clickup", implemented: true, tasks: [], message: "CLICKUP_API_TOKEN is not set" };
+    return { provider: "clickup", implemented: true, tasks: [], message: "ClickUp is not connected" };
   }
   if (listIds.length === 0 && !teamId) {
     return {
       provider: "clickup",
       implemented: true,
       tasks: [],
-      message: "Set CLICKUP_LIST_IDS or CLICKUP_TEAM_ID",
+      message: "Set a list id or team id on the ClickUp connection",
     };
   }
   const fetchImpl = input.fetchImpl ?? fetch;

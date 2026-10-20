@@ -1,16 +1,17 @@
 import { v } from "convex/values";
-import { tokensMatch } from "./model/auth";
+import { sha256Hex } from "./model/secrets";
 import { planSnapshot } from "./model/store";
 import type { FleetSnapshot } from "./model/types";
 import { loadState, writeState } from "./persist";
 import { internalMutation, mutation } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { ingestResult, snapshotValidator } from "./validators";
 
-async function apply(ctx: MutationCtx, snapshot: FleetSnapshot, replace: boolean) {
-  const { state } = await loadState(ctx, true);
+async function apply(ctx: MutationCtx, workspaceId: Id<"workspaces">, snapshot: FleetSnapshot, replace: boolean) {
+  const { state } = await loadState(ctx, workspaceId, true);
   const next = planSnapshot(state, snapshot, { now: Date.now(), replace });
-  await writeState(ctx, next);
+  await writeState(ctx, workspaceId, next);
   return {
     bots: next.bots.length,
     routines: next.routines.length,
@@ -21,16 +22,21 @@ async function apply(ctx: MutationCtx, snapshot: FleetSnapshot, replace: boolean
 }
 
 export const applySnapshot = internalMutation({
-  args: { snapshot: snapshotValidator, replace: v.boolean() },
+  args: { workspaceId: v.id("workspaces"), snapshot: snapshotValidator, replace: v.boolean() },
   returns: ingestResult,
-  handler: async (ctx, args) => apply(ctx, args.snapshot, args.replace),
+  handler: async (ctx, args) => apply(ctx, args.workspaceId, args.snapshot, args.replace),
 });
 
 export const ingestFleet = mutation({
   args: { token: v.string(), snapshot: snapshotValidator, replace: v.optional(v.boolean()) },
   returns: ingestResult,
   handler: async (ctx, args) => {
-    if (!tokensMatch(args.token, process.env.TASKMAN_INGEST_TOKEN)) throw new Error("Unauthorized");
-    return apply(ctx, args.snapshot, args.replace !== false);
+    const tokenHash = await sha256Hex(args.token);
+    const match = await ctx.db
+      .query("ingestTokens")
+      .withIndex("by_tokenHash", (q) => q.eq("tokenHash", tokenHash))
+      .unique();
+    if (!match || match.revokedAt) throw new Error("Unauthorized");
+    return apply(ctx, match.workspaceId, args.snapshot, args.replace !== false);
   },
 });

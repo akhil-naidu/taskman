@@ -20,11 +20,11 @@ describe("push-fleet", () => {
     expect(snapshot.waiting).toHaveLength(5);
   });
 
-  it("posts the snapshot with the shared-secret header", async () => {
+  it("posts the snapshot with the workspace token header", async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ bots: 5 }), { status: 200 }));
     const stdout: string[] = [];
-    const code = await runPush(["--root", root, "--now", "2026-10-20T06:30:00.000Z"], {
-      env: { TASKMAN_INGEST_TOKEN: "test-token", TASKMAN_INGEST_URL: "https://example.com" },
+    const code = await runPush(["--root", root, "--token", "test-token", "--now", "2026-10-20T06:30:00.000Z"], {
+      env: { TASKMAN_INGEST_URL: "https://example.com" },
       fetchImpl,
       stdout: (chunk) => stdout.push(chunk),
     });
@@ -40,8 +40,8 @@ describe("push-fleet", () => {
 
   it("fails closed when the ingest response is rejected", async () => {
     const stderr: string[] = [];
-    const code = await runPush(["--root", root], {
-      env: { TASKMAN_INGEST_TOKEN: "test-token", TASKMAN_INGEST_URL: "https://example.com/ingest" },
+    const code = await runPush(["--root", root, "--token", "test-token"], {
+      env: { TASKMAN_INGEST_URL: "https://example.com/ingest" },
       fetchImpl: async () => new Response("no", { status: 401 }),
       stderr: (chunk) => stderr.push(chunk),
     });

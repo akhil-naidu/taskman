@@ -21,7 +21,7 @@ export async function runPush(argv: string[], io: Io): Promise<number> {
   const stderr = io.stderr ?? ((chunk) => process.stderr.write(chunk));
   if (argv.includes("--help")) {
     stdout(
-      "Usage: pnpm push-fleet --root <dir> [--dry-run] [--url <ingest-url>] [--now <iso>]\n",
+      "Usage: pnpm push-fleet --root <dir> [--dry-run] [--url <ingest-url>] [--token <workspace-token>] [--now <iso>]\n",
     );
     return 0;
   }
@@ -48,9 +48,9 @@ export async function runPush(argv: string[], io: Io): Promise<number> {
     return 0;
   }
   const url = readFlag(argv, "--url") ?? io.env.TASKMAN_INGEST_URL;
-  const token = io.env.TASKMAN_INGEST_TOKEN;
+  const token = readFlag(argv, "--token");
   if (!url || !token) {
-    stderr("Set TASKMAN_INGEST_URL and TASKMAN_INGEST_TOKEN, or pass --url\n");
+    stderr("Pass --token and set TASKMAN_INGEST_URL, or pass --url.\n");
     return 1;
   }
   const endpoint = url.endsWith("/ingest") ? url : `${url.replace(/\/$/, "")}/ingest`;

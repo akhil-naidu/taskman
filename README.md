@@ -10,7 +10,7 @@ npx convex dev
 pnpm dev
 ```
 
-`npx convex dev` writes `CONVEX_URL` and `CONVEX_DEPLOYMENT` into `.env.local`. Copy `CONVEX_URL` to `NEXT_PUBLIC_CONVEX_URL` in that same file. Without `NEXT_PUBLIC_CONVEX_URL`, the UI shows the checked-in example snapshot (`bot-a` through `bot-e`).
+`npx convex dev` writes `CONVEX_URL` and `CONVEX_DEPLOYMENT` into `.env.local`. Copy `CONVEX_URL` to `NEXT_PUBLIC_CONVEX_URL` in that same file. Without `NEXT_PUBLIC_CONVEX_URL`, the UI shows the checked-in example snapshot (`bot-a` through `bot-e`). With it set, sign in, create a workspace, and connect trackers from Settings.
 
 ```bash
 pnpm lint
@@ -30,7 +30,7 @@ The shared dev deployment is `dev:courteous-chicken-605` (project `taskman`, tea
 | HTTP actions | `https://courteous-chicken-605.convex.site` |
 | Ingest | `https://courteous-chicken-605.convex.site/ingest` |
 
-For the Next.js process, set `NEXT_PUBLIC_CONVEX_URL` to the `.convex.cloud` URL and `TASKMAN_INGEST_URL` to the ingest URL. Keep `CONVEX_DEPLOY_KEY` and `TASKMAN_INGEST_TOKEN` in the environment or a host secret store. Do not commit either value.
+For the Next.js process, set `NEXT_PUBLIC_CONVEX_URL` to the `.convex.cloud` URL and `TASKMAN_INGEST_URL` to the ingest URL. Keep `CONVEX_DEPLOY_KEY` in the environment or a host secret store. Do not commit it.
 
 Push schema and functions to that dev deployment with a dev deploy key:
 
@@ -40,14 +40,17 @@ CONVEX_DEPLOY_KEY='<dev deploy key>' npx convex dev --once
 
 `npx convex deploy` targets a production or preview deployment. Use `npx convex dev --once` for this dev deployment.
 
-Set Convex environment variables on the same deployment. The key selects the deployment, so these commands do not need `--prod`:
+Set platform environment variables on the same deployment. The key selects the deployment, so these commands do not need `--prod`:
 
 ```bash
-CONVEX_DEPLOY_KEY='<dev deploy key>' npx convex env set TASKMAN_INGEST_TOKEN "$TASKMAN_INGEST_TOKEN"
+CONVEX_DEPLOY_KEY='<dev deploy key>' npx convex env set JWT_PRIVATE_KEY "$JWT_PRIVATE_KEY"
+CONVEX_DEPLOY_KEY='<dev deploy key>' npx convex env set JWKS "$JWKS"
+CONVEX_DEPLOY_KEY='<dev deploy key>' npx convex env set SITE_URL "$SITE_URL"
+CONVEX_DEPLOY_KEY='<dev deploy key>' npx convex env set TASKMAN_ENCRYPTION_KEY "$TASKMAN_ENCRYPTION_KEY"
 CONVEX_DEPLOY_KEY='<dev deploy key>' npx convex env list --names-only
 ```
 
-`TASKMAN_INGEST_TOKEN` is required for `POST /ingest`. Leave `CLICKUP_API_TOKEN` unset until a read-only ClickUp token is available; ClickUp sync reports that it is not configured and does not call ClickUp. `CLICKUP_TEAM_ID` and `CLICKUP_LIST_IDS` stay unset with it. `GITHUB_TOKEN`, `LINEAR_API_KEY`, `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN` are unused stubs and stay unset.
+`JWT_PRIVATE_KEY` and `JWKS` are the Convex Auth signing keys. `TASKMAN_ENCRYPTION_KEY` is 32 bytes of base64 and encrypts workspace integration secrets. Customer tracker tokens are not environment variables. Optional `TASKMAN_OAUTH_*_CLIENT_ID` and `TASKMAN_OAUTH_*_CLIENT_SECRET` pairs are the TaskMan app's OAuth client, used only when a workspace starts OAuth. Leave them unset to paste a token in Settings.
 
 ## Environment
 
@@ -59,16 +62,13 @@ Names only. Put values in `.env.local` or the host's secret store. `.env.example
 | `CONVEX_URL` | Convex cloud URL for server clients |
 | `NEXT_PUBLIC_CONVEX_URL` | Same cloud URL, read by the browser |
 | `CONVEX_DEPLOY_KEY` | Convex deploy key. Not read at runtime |
-| `TASKMAN_INGEST_TOKEN` | Shared secret for ingest |
+| `JWT_PRIVATE_KEY` | Convex Auth signing key. Set on the Convex deployment |
+| `JWKS` | Convex Auth public key set. Set on the Convex deployment |
+| `SITE_URL` | Browser origin, used when OAuth returns to the app |
+| `TASKMAN_ENCRYPTION_KEY` | Platform key that encrypts workspace integration secrets |
+| `TASKMAN_OAUTH_*_CLIENT_ID` | Optional platform OAuth client id. Not a customer token |
+| `TASKMAN_OAUTH_*_CLIENT_SECRET` | Optional platform OAuth client secret. Not a customer token |
 | `TASKMAN_INGEST_URL` | Convex HTTP route, `https://<deployment>.convex.site/ingest` |
-| `CLICKUP_API_TOKEN` | Read-only ClickUp token. Leave unset until one is available |
-| `CLICKUP_TEAM_ID` | ClickUp workspace id |
-| `CLICKUP_LIST_IDS` | Comma-separated ClickUp list ids |
-| `GITHUB_TOKEN` | Reserved. Unused |
-| `LINEAR_API_KEY` | Reserved. Unused |
-| `JIRA_BASE_URL` | Reserved. Unused |
-| `JIRA_EMAIL` | Reserved. Unused |
-| `JIRA_API_TOKEN` | Reserved. Unused |
 
 HTTP actions are served from the `.convex.site` host. Queries and the browser client use the `.convex.cloud` host.
 
@@ -90,12 +90,12 @@ fixtures/fleet/
 
 ```bash
 pnpm push-fleet -- --root fixtures/fleet --dry-run
-pnpm push-fleet -- --root fixtures/fleet
+pnpm push-fleet -- --root fixtures/fleet --token '<workspace ingest token>'
 ```
 
-The live command reads `TASKMAN_INGEST_URL` and `TASKMAN_INGEST_TOKEN`. It sends `x-taskman-token`. Posting the same snapshot twice upserts by stable keys and does not create duplicate bots, routines, tasks, or sync links.
+The live command reads `TASKMAN_INGEST_URL` and a workspace ingest token passed with `--token`. It sends `x-taskman-token`. Create that token in Settings. The server stores only a hash, and the push writes only that workspace. Posting the same snapshot twice upserts by stable keys and does not create duplicate bots, routines, tasks, or sync links.
 
-The HTTP route is `POST /ingest`. A Convex mutation, `ingestFleet`, checks the same secret when a caller uses the Convex client instead of HTTP. Prefer the HTTP route.
+The HTTP route is `POST /ingest`. A Convex mutation, `ingestFleet`, checks the same workspace token when a caller uses the Convex client instead of HTTP. Prefer the HTTP route. A missing, unknown, or revoked token is rejected.
 
 Lists are capped (200 bots, 500 tasks). An ingest that would pass the cap fails instead of dropping rows.
 
@@ -103,8 +103,8 @@ Lists are capped (200 bots, 500 tasks). An ingest that would pass the cap fails 
 
 Adapters live in `convex/model/sync.ts`. Each one is read-only: `pull` only, no create or update method.
 
-- **ClickUp** is implemented. It GETs list or team tasks, keeps the external id and URL, and upserts on `clickup:<id>`. Set `CLICKUP_LIST_IDS` or `CLICKUP_TEAM_ID` plus `CLICKUP_API_TOKEN`. The Board page runs it with **Sync ClickUp**. There is no write-back.
-- **GitHub Issues, Linear, and Jira** are stubs. Their buttons report that the adapter is not implemented and do not call those APIs.
+- **ClickUp** is implemented. It GETs list or team tasks with the token saved on the workspace, keeps the external id and URL, and upserts on `clickup:<id>`. Put a team id or list ids on that connection. The Board page runs it with **Sync ClickUp**. There is no write-back.
+- **GitHub Issues, Linear, and Jira** are stubs. Their buttons report that the adapter is not implemented and do not call those APIs. Credentials for those providers, and for Dropbox, can still be saved on the workspace.
 
 ## Railway
 

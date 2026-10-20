@@ -1,7 +1,7 @@
+import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
-const scope = v.string();
 const taskStatus = v.union(v.literal("waiting"), v.literal("todo"), v.literal("in_progress"), v.literal("done"));
 const urgency = v.union(v.literal("high"), v.literal("normal"));
 const provider = v.union(
@@ -11,10 +11,61 @@ const provider = v.union(
   v.literal("jira"),
   v.literal("fleet"),
 );
+export const integrationProvider = v.union(
+  v.literal("clickup"),
+  v.literal("linear"),
+  v.literal("github"),
+  v.literal("jira"),
+  v.literal("dropbox"),
+);
+
+const workspaceId = v.id("workspaces");
 
 export default defineSchema({
+  ...authTables,
+  workspaces: defineTable({
+    name: v.string(),
+    slug: v.string(),
+    createdAt: v.number(),
+  }).index("by_slug", ["slug"]),
+  members: defineTable({
+    workspaceId,
+    userId: v.id("users"),
+    role: v.union(v.literal("owner"), v.literal("member")),
+  })
+    .index("by_workspace", ["workspaceId"])
+    .index("by_user", ["userId"])
+    .index("by_workspace_user", ["workspaceId", "userId"]),
+  credentials: defineTable({
+    workspaceId,
+    provider: integrationProvider,
+    hint: v.string(),
+    ciphertext: v.string(),
+    iv: v.string(),
+    config: v.string(),
+    updatedAt: v.number(),
+  })
+    .index("by_workspace", ["workspaceId"])
+    .index("by_workspace_provider", ["workspaceId", "provider"]),
+  oauthStates: defineTable({
+    state: v.string(),
+    workspaceId,
+    userId: v.id("users"),
+    provider: integrationProvider,
+    expiresAt: v.number(),
+  }).index("by_state", ["state"]),
+  ingestTokens: defineTable({
+    workspaceId,
+    name: v.string(),
+    tokenHash: v.string(),
+    hint: v.string(),
+    revokedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_workspace", ["workspaceId"])
+    .index("by_tokenHash", ["tokenHash"]),
   bots: defineTable({
-    scope,
+    workspaceId,
     key: v.string(),
     name: v.string(),
     description: v.string(),
@@ -31,23 +82,19 @@ export default defineSchema({
     notes: v.array(v.string()),
     updatedAt: v.number(),
   })
-    .index("by_key", ["key"])
-    .index("by_scope", ["scope"])
-    .index("by_org", ["org"]),
-
+    .index("by_workspace", ["workspaceId"])
+    .index("by_workspace_key", ["workspaceId", "key"]),
   routines: defineTable({
-    scope,
+    workspaceId,
     key: v.string(),
     botKey: v.string(),
     name: v.string(),
     updatedAt: v.number(),
   })
-    .index("by_key", ["key"])
-    .index("by_scope", ["scope"])
-    .index("by_botKey", ["botKey"]),
-
+    .index("by_workspace", ["workspaceId"])
+    .index("by_workspace_key", ["workspaceId", "key"]),
   runs: defineTable({
-    scope,
+    workspaceId,
     key: v.string(),
     botKey: v.string(),
     summary: v.string(),
@@ -56,12 +103,10 @@ export default defineSchema({
     finishedAt: v.number(),
     updatedAt: v.number(),
   })
-    .index("by_key", ["key"])
-    .index("by_scope", ["scope"])
-    .index("by_botKey", ["botKey"]),
-
+    .index("by_workspace", ["workspaceId"])
+    .index("by_workspace_key", ["workspaceId", "key"]),
   tasks: defineTable({
-    scope,
+    workspaceId,
     key: v.string(),
     title: v.string(),
     status: taskStatus,
@@ -79,26 +124,20 @@ export default defineSchema({
     addedDate: v.string(),
     updatedAt: v.number(),
   })
-    .index("by_key", ["key"])
-    .index("by_scope", ["scope"])
-    .index("by_status", ["status"])
-    .index("by_claimKey", ["claimKey"])
-    .index("by_sourceKey", ["sourceKey"]),
-
+    .index("by_workspace", ["workspaceId"])
+    .index("by_workspace_key", ["workspaceId", "key"]),
   sources: defineTable({
-    scope,
+    workspaceId,
     key: v.string(),
     provider,
     name: v.string(),
     readOnly: v.boolean(),
     updatedAt: v.number(),
   })
-    .index("by_key", ["key"])
-    .index("by_scope", ["scope"])
-    .index("by_provider", ["provider"]),
-
+    .index("by_workspace", ["workspaceId"])
+    .index("by_workspace_key", ["workspaceId", "key"]),
   syncLinks: defineTable({
-    scope,
+    workspaceId,
     key: v.string(),
     sourceKey: v.string(),
     externalId: v.string(),
@@ -107,12 +146,10 @@ export default defineSchema({
     url: v.string(),
     lastSyncedAt: v.number(),
   })
-    .index("by_key", ["key"])
-    .index("by_scope", ["scope"])
-    .index("by_taskKey", ["taskKey"]),
-
+    .index("by_workspace", ["workspaceId"])
+    .index("by_workspace_key", ["workspaceId", "key"]),
   ingestRuns: defineTable({
-    scope,
+    workspaceId,
     key: v.string(),
     receivedAt: v.number(),
     botCount: v.number(),
@@ -120,6 +157,6 @@ export default defineSchema({
     status: v.union(v.literal("ok"), v.literal("error")),
     message: v.string(),
   })
-    .index("by_key", ["key"])
-    .index("by_scope", ["scope"]),
+    .index("by_workspace", ["workspaceId"])
+    .index("by_workspace_key", ["workspaceId", "key"]),
 });
