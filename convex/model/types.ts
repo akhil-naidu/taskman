@@ -1,4 +1,4 @@
-export const TASK_STATUSES = ["waiting", "todo", "in_progress", "done"] as const;
+export const TASK_STATUSES = ["waiting", "todo", "in_progress", "done", "backlog", "approved", "waiting_human"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
 export const BOT_STATUSES = ["waiting", "active", "routine", "on-demand"] as const;
@@ -101,6 +101,11 @@ export type BotRow = {
   activity: string[];
   notes: string[];
   reportedStatus?: BotStatus;
+  origin?: "mcp" | "fleet";
+  heartbeatStatus?: string;
+  currentTaskKey?: string;
+  currentTaskText?: string;
+  lastHeartbeatAt?: number;
   updatedAt: number;
 };
 
@@ -139,7 +144,27 @@ export type TaskRow = {
   externalId: string;
   externalUrl: string;
   addedDate: string;
+  needsHuman?: boolean;
+  question?: string;
+  options?: string[];
+  progress?: string[];
+  decision?: string;
   updatedAt: number;
+};
+
+export type InstructionKind = "instruction" | "decision";
+
+export type InstructionRow = {
+  key: string;
+  botKey: string;
+  taskKey: string;
+  kind: InstructionKind;
+  body: string;
+  options: string[];
+  answer: string;
+  status: "pending" | "acked";
+  createdAt: number;
+  ackedAt: number;
 };
 
 export type SourceRow = {
@@ -176,6 +201,7 @@ export type FleetState = {
   sources: SourceRow[];
   syncLinks: SyncLinkRow[];
   ingestRuns: IngestRunRow[];
+  instructions: InstructionRow[];
 };
 
 export type RemoteTask = {
@@ -206,6 +232,9 @@ export type BotView = {
   notes: string[];
   status: BotStatus;
   currentWork: string;
+  heartbeatStatus: string;
+  lastHeartbeatAt: number;
+  currentTask: string;
 };
 
 export type TaskView = {
@@ -222,12 +251,28 @@ export type TaskView = {
   sourceKey: string;
   externalUrl?: string;
   addedDate?: string;
+  needsHuman: boolean;
+  question: string;
+  options: string[];
+  progress: string[];
+  decision: string;
+};
+
+export type InstructionView = {
+  key: string;
+  botKey: string;
+  taskKey: string;
+  kind: InstructionKind;
+  body: string;
+  answer: string;
+  status: "pending" | "acked";
 };
 
 export type FleetView = {
   generatedAt: number;
   bots: BotView[];
   tasks: TaskView[];
+  instructions: InstructionView[];
   tiles: {
     bots: number;
     orgs: number;

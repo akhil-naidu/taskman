@@ -1,7 +1,7 @@
 "use client";
 
 import { useConvexAuth, useQuery } from "convex/react";
-import { Bot, Cable, KanbanSquare, Settings } from "lucide-react";
+import { Bot, Cable, KanbanSquare, Plug, Settings, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -22,6 +22,8 @@ import { activeWorkspace, useWorkspaceSelection } from "@/components/workspace-s
 const NAV = [
   { id: "fleet", href: "/", label: "Fleet", icon: Bot },
   { id: "board", href: "/board", label: "Board", icon: KanbanSquare },
+  { id: "bots", href: "/bots", label: "Bots", icon: Users },
+  { id: "connect", href: "/connect", label: "Connect", icon: Plug },
   { id: "connections", href: "/connections", label: "Connections", icon: Cable },
   { id: "settings", href: "/settings", label: "Settings", icon: Settings },
 ] as const;
@@ -46,7 +48,7 @@ export function Shell({ current, children }: { current: (typeof NAV)[number]["id
   function hrefFor(id: (typeof NAV)[number]["id"], view?: "list") {
     const params = new URLSearchParams();
     const org = searchParams.get("org");
-    if ((id === "fleet" || id === "board") && org) params.set("org", org);
+    if ((id === "fleet" || id === "board" || id === "bots") && org) params.set("org", org);
     if (id === "board" && view === "list") params.set("view", "list");
     const path = NAV.find((item) => item.id === id)?.href ?? "/";
     const query = params.toString();
@@ -111,6 +113,12 @@ export function Shell({ current, children }: { current: (typeof NAV)[number]["id
               </CommandItem>
               <CommandItem value="board list" onSelect={() => go(hrefFor("board", "list"))}>
                 Board list
+              </CommandItem>
+              <CommandItem value="bots" onSelect={() => go(hrefFor("bots"))}>
+                Bots
+              </CommandItem>
+              <CommandItem value="connect" onSelect={() => go(hrefFor("connect"))}>
+                Connect
               </CommandItem>
               <CommandItem value="connections" onSelect={() => go(hrefFor("connections"))}>
                 Connections

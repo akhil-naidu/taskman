@@ -1,17 +1,24 @@
 "use client";
 
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 
 export default function SignInPage() {
   if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
     return <p className="p-6 text-sm text-[var(--mu)]">Set NEXT_PUBLIC_CONVEX_URL before signing in.</p>;
   }
-  return <SignInForm />;
+  return (
+    <Suspense fallback={<p className="p-6 text-sm text-[var(--mu)]">Loading…</p>}>
+      <SignInForm />
+    </Suspense>
+  );
 }
 
 function SignInForm() {
   const { signIn } = useAuthActions();
+  const router = useRouter();
+  const params = useSearchParams();
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -24,6 +31,9 @@ function SignInForm() {
     form.set("flow", flow);
     try {
       await signIn("password", form);
+      const next = params.get("next");
+      router.push(next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/signin") ? next : "/");
+      router.refresh();
     } catch {
       setError(flow === "signUp" ? "Could not create that account." : "Email or password is wrong.");
       setPending(false);

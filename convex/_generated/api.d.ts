@@ -9,6 +9,7 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as board from "../board.js";
 import type * as credentials from "../credentials.js";
 import type * as fleet from "../fleet.js";
 import type * as guard from "../guard.js";
@@ -18,6 +19,9 @@ import type * as ingestTokens from "../ingestTokens.js";
 import type * as mcp from "../mcp.js";
 import type * as model_auth from "../model/auth.js";
 import type * as model_clock from "../model/clock.js";
+import type * as model_columns from "../model/columns.js";
+import type * as model_decisions from "../model/decisions.js";
+import type * as model_oauth from "../model/oauth.js";
 import type * as model_orgs from "../model/orgs.js";
 import type * as model_parser from "../model/parser.js";
 import type * as model_secrets from "../model/secrets.js";
@@ -26,6 +30,7 @@ import type * as model_sync from "../model/sync.js";
 import type * as model_text from "../model/text.js";
 import type * as model_types from "../model/types.js";
 import type * as model_view from "../model/view.js";
+import type * as oauth from "../oauth.js";
 import type * as persist from "../persist.js";
 import type * as sync from "../sync.js";
 import type * as validators from "../validators.js";
@@ -39,6 +44,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  board: typeof board;
   credentials: typeof credentials;
   fleet: typeof fleet;
   guard: typeof guard;
@@ -48,6 +54,9 @@ declare const fullApi: ApiFromModules<{
   mcp: typeof mcp;
   "model/auth": typeof model_auth;
   "model/clock": typeof model_clock;
+  "model/columns": typeof model_columns;
+  "model/decisions": typeof model_decisions;
+  "model/oauth": typeof model_oauth;
   "model/orgs": typeof model_orgs;
   "model/parser": typeof model_parser;
   "model/secrets": typeof model_secrets;
@@ -56,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   "model/text": typeof model_text;
   "model/types": typeof model_types;
   "model/view": typeof model_view;
+  oauth: typeof oauth;
   persist: typeof persist;
   sync: typeof sync;
   validators: typeof validators;

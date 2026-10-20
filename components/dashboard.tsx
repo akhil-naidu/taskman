@@ -6,16 +6,10 @@ import { Shell } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatIst } from "@/convex/model/clock";
+import { BOARD_COLUMNS, boardColumn } from "@/convex/model/columns";
 import { orgSlug } from "@/convex/model/orgs";
 import type { BotView, FleetView, SyncProvider, TaskView } from "@/convex/model/types";
 import { orgOptions } from "@/convex/model/view";
-
-const COLUMNS = [
-  ["waiting", "Waiting"],
-  ["todo", "To do"],
-  ["in_progress", "In progress"],
-  ["done", "Done"],
-] as const;
 
 const PROVIDERS: { id: SyncProvider; label: string }[] = [
   { id: "clickup", label: "Sync ClickUp" },
@@ -31,13 +25,19 @@ export function Dashboard({
   onSync,
   syncing = false,
   syncMessage,
+  onApprove,
+  onAnswer,
+  onQueue,
 }: {
-  page: "fleet" | "board";
+  page: "fleet" | "board" | "bots";
   model: FleetView;
   mode: "example" | "live";
   onSync?: (provider: SyncProvider) => void;
   syncing?: boolean;
   syncMessage?: string;
+  onApprove?: (key: string) => void;
+  onAnswer?: (key: string, answer: string) => void;
+  onQueue?: (body: string) => void;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -72,7 +72,7 @@ export function Dashboard({
         <header className="mb-4 flex flex-col gap-3">
           <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <div className="min-w-0">
-              <h1 className="text-base font-semibold tracking-tight">{page === "fleet" ? "Fleet" : "Board"}</h1>
+              <h1 className="text-base font-semibold tracking-tight">{page === "fleet" ? "Fleet" : page === "bots" ? "Bots" : "Board"}</h1>
               <p className="text-xs text-muted-foreground">Updated {formatIst(model.generatedAt)}</p>
             </div>
             <div className="md:ml-auto flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -123,6 +123,8 @@ export function Dashboard({
           </p>
         ) : page === "fleet" ? (
           <FleetPage model={model} selected={selected} needle={needle} />
+        ) : page === "bots" ? (
+          <BotsPage model={model} selected={selected} needle={needle} />
         ) : (
           <BoardPage
             model={model}
@@ -133,6 +135,9 @@ export function Dashboard({
             onSync={onSync}
             syncing={syncing}
             syncMessage={syncMessage}
+            onApprove={onApprove}
+            onAnswer={onAnswer}
+            onQueue={onQueue}
           />
         )}
       </main>
@@ -185,6 +190,9 @@ function BoardPage({
   onSync,
   syncing,
   syncMessage,
+  onApprove,
+  onAnswer,
+  onQueue,
 }: {
   model: FleetView;
   selected: string;
@@ -194,6 +202,9 @@ function BoardPage({
   onSync?: (provider: SyncProvider) => void;
   syncing: boolean;
   syncMessage?: string;
+  onApprove?: (key: string) => void;
+  onAnswer?: (key: string, answer: string) => void;
+  onQueue?: (body: string) => void;
 }) {
   const tasks = model.tasks.filter((task) => orgMatches(task.org, selected) && taskMatches(needle, task));
   const conflicts = tasks.filter((task) => task.conflict).length;
@@ -223,16 +234,18 @@ function BoardPage({
           {syncMessage}
         </p>
       ) : null}
-      {view === "list" ? <TaskList tasks={tasks} /> : <TaskColumns tasks={tasks} />}
+      <DecisionInbox tasks={tasks} onAnswer={onAnswer} />
+      <QueueForm onQueue={onQueue} />
+      {view === "list" ? <TaskList tasks={tasks} /> : <TaskColumns tasks={tasks} onApprove={onApprove} />}
     </>
   );
 }
 
-function TaskColumns({ tasks }: { tasks: TaskView[] }) {
+function TaskColumns({ tasks, onApprove }: { tasks: TaskView[]; onApprove?: (key: string) => void }) {
   return (
-      <div className="grid gap-3 md:grid-cols-4">
-        {COLUMNS.map(([status, label]) => {
-          const column = tasks.filter((task) => task.status === status);
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+        {BOARD_COLUMNS.map(([status, label]) => {
+          const column = tasks.filter((task) => boardColumn(task) === status);
           return (
             <section key={status} className="rounded-xl border border-[var(--line)] bg-[var(--panel)]">
               <h2 className="flex items-center justify-between border-b border-[var(--line)] px-3 py-2 text-sm font-semibold">
@@ -242,7 +255,7 @@ function TaskColumns({ tasks }: { tasks: TaskView[] }) {
               <div className="space-y-2 p-2">
                 {column.length === 0 ? <p className="px-1 py-4 text-center text-xs text-[var(--mu)]">Nothing here</p> : null}
                 {column.map((task) => (
-                  <TaskCard key={task.key} task={task} />
+                  <TaskCard key={task.key} task={task} onApprove={status === "backlog" ? onApprove : undefined} />
                 ))}
               </div>
             </section>
@@ -275,7 +288,7 @@ function TaskList({ tasks }: { tasks: TaskView[] }) {
                 {task.title}
                 {task.conflict ? <span className="ml-2 text-[10px] tracking-wide text-[var(--hi)] uppercase">Conflict</span> : null}
               </td>
-              <td className="px-3 py-2 text-muted-foreground">{task.status.replace("_", " ")}</td>
+              <td className="px-3 py-2 text-muted-foreground">{columnLabel(boardColumn(task))}</td>
               <td className="px-3 py-2">{task.ownerLabel}</td>
               <td className="px-3 py-2">{task.org}</td>
             </tr>
@@ -326,7 +339,7 @@ function BotCard({ bot }: { bot: BotView }) {
   );
 }
 
-function TaskCard({ task }: { task: TaskView }) {
+function TaskCard({ task, onApprove }: { task: TaskView; onApprove?: (key: string) => void }) {
   return (
     <article className="rounded-lg border border-[var(--line)] bg-[var(--panel2)] p-2.5">
       <p className="text-sm font-medium">{task.title}</p>
@@ -338,6 +351,15 @@ function TaskCard({ task }: { task: TaskView }) {
         {task.conflict ? <Badge hot>Conflict</Badge> : null}
         {task.urgency === "high" ? <Badge hot>High</Badge> : null}
         {task.claimants.length > 1 ? <Badge>{task.claimants.join(", ")}</Badge> : null}
+        {onApprove ? (
+          <Button type="button" size="sm" variant="outline" onClick={() => onApprove(task.key)}>
+            Approve
+          </Button>
+        ) : boardColumn(task) === "backlog" ? (
+          <Button type="button" size="sm" variant="outline" disabled>
+            Approve
+          </Button>
+        ) : null}
         {task.externalUrl ? (
           <a className="text-xs text-[var(--ac)] underline" href={task.externalUrl} target="_blank" rel="noreferrer">
             Source
@@ -346,6 +368,113 @@ function TaskCard({ task }: { task: TaskView }) {
       </div>
     </article>
   );
+}
+
+function BotsPage({ model, selected, needle }: { model: FleetView; selected: string; needle: string }) {
+  const bots = model.bots.filter((bot) => orgMatches(bot.org, selected) && matches(needle, bot));
+  if (bots.length === 0) {
+    return <p className="rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">No bots yet</p>;
+  }
+  return (
+    <div className="overflow-hidden rounded-md border border-border">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b border-border text-xs text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2 font-medium">Bot</th>
+            <th className="px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 font-medium">Last heartbeat</th>
+            <th className="px-3 py-2 font-medium">Current task</th>
+          </tr>
+        </thead>
+        <tbody>
+          {bots.map((bot) => (
+            <tr key={bot.key} className="border-b border-border last:border-b-0">
+              <td className="px-3 py-2">
+                <div className="font-medium">{bot.name}</div>
+                <div className="text-xs text-muted-foreground">{bot.org}</div>
+              </td>
+              <td className="px-3 py-2">{bot.heartbeatStatus || bot.status}</td>
+              <td className="px-3 py-2 text-muted-foreground">{bot.lastHeartbeatAt ? formatIst(bot.lastHeartbeatAt) : "No heartbeat"}</td>
+              <td className="px-3 py-2">{bot.currentTask || bot.currentWork}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function DecisionInbox({ tasks, onAnswer }: { tasks: TaskView[]; onAnswer?: (key: string, answer: string) => void }) {
+  const waiting = tasks.filter((task) => task.needsHuman && !task.decision);
+  return (
+    <section className="mb-4 rounded-md border border-border">
+      <h2 className="border-b border-border px-3 py-2 text-sm font-semibold">Needs your decision</h2>
+      {waiting.length === 0 ? <p className="px-3 py-4 text-sm text-muted-foreground">Nothing needs a decision</p> : null}
+      <ul>
+        {waiting.map((task) => (
+          <li key={task.key} className="border-b border-border px-3 py-3 last:border-b-0">
+            <p className="text-sm font-medium">{task.title}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{task.question || "This task needs a decision."}</p>
+            <AnswerForm task={task} onAnswer={onAnswer} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function AnswerForm({ task, onAnswer }: { task: TaskView; onAnswer?: (key: string, answer: string) => void }) {
+  const [text, setText] = useState("");
+  if (task.options.length > 0) {
+    return (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {task.options.map((option) => (
+          <Button key={option} type="button" size="sm" variant="outline" disabled={!onAnswer} onClick={() => onAnswer?.(task.key, option)}>
+            {option}
+          </Button>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <form
+      className="mt-2 flex gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (text.trim()) onAnswer?.(task.key, text.trim());
+      }}
+    >
+      <Input value={text} onChange={(event) => setText(event.target.value)} aria-label={`Answer for ${task.title}`} disabled={!onAnswer} />
+      <Button type="submit" size="sm" variant="outline" disabled={!onAnswer || !text.trim()}>
+        Send answer
+      </Button>
+    </form>
+  );
+}
+
+function QueueForm({ onQueue }: { onQueue?: (body: string) => void }) {
+  const [body, setBody] = useState("");
+  if (!onQueue) return null;
+  return (
+    <form
+      className="mb-4 flex flex-col gap-2 sm:flex-row"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!body.trim()) return;
+        onQueue(body.trim());
+        setBody("");
+      }}
+    >
+      <Input value={body} onChange={(event) => setBody(event.target.value)} aria-label="Instruction for a bot" placeholder="Queue an instruction for the next wake" />
+      <Button type="submit" variant="outline" disabled={!body.trim()}>
+        Queue
+      </Button>
+    </form>
+  );
+}
+
+function columnLabel(id: string) {
+  return BOARD_COLUMNS.find((column) => column[0] === id)?.[1] ?? id;
 }
 
 function WaitingGroup({ group }: { group: { owner: string; tasks: TaskView[] } }) {

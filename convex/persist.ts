@@ -13,6 +13,7 @@ export const LIMITS = {
   sources: 50,
   syncLinks: 500,
   ingestRuns: 20,
+  instructions: 200,
 } as const;
 
 function strip<T extends { _id: string; _creationTime: number; workspaceId: string }>(doc: T) {
@@ -21,6 +22,14 @@ function strip<T extends { _id: string; _creationTime: number; workspaceId: stri
   void _creationTime;
   void workspaceId;
   return rest;
+}
+
+function definedRow<T extends object>(row: T): T {
+  const next: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) {
+    if (value !== undefined) next[key] = value;
+  }
+  return next as T;
 }
 
 function capped(length: number, limit: number, strict: boolean, table: string) {
@@ -82,6 +91,10 @@ export async function loadState(
     .query("ingestRuns")
     .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
     .take(LIMITS.ingestRuns);
+  const instructions = await ctx.db
+    .query("instructions")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.instructions);
   const truncated =
     capped(bots.length, LIMITS.bots, strict, "bots") ||
     capped(routines.length, LIMITS.routines, strict, "routines") ||
@@ -89,7 +102,8 @@ export async function loadState(
     capped(tasks.length, LIMITS.tasks, strict, "tasks") ||
     capped(sources.length, LIMITS.sources, strict, "sources") ||
     capped(syncLinks.length, LIMITS.syncLinks, strict, "syncLinks") ||
-    capped(ingestRuns.length, LIMITS.ingestRuns, strict, "ingestRuns");
+    capped(ingestRuns.length, LIMITS.ingestRuns, strict, "ingestRuns") ||
+    capped(instructions.length, LIMITS.instructions, strict, "instructions");
   return {
     truncated,
     state: {
@@ -104,17 +118,19 @@ export async function loadState(
         return link;
       }),
       ingestRuns: ingestRuns.map((doc) => strip(doc)),
+      instructions: instructions.map((doc) => strip(doc)),
     },
   };
 }
 
 export async function writeState(ctx: MutationCtx, workspaceId: WorkspaceId, state: FleetState) {
-  const bots = state.bots.map((row) => ({ ...row, workspaceId }));
-  const routines = state.routines.map((row) => ({ ...row, workspaceId }));
-  const runs = state.runs.map((row) => ({ ...row, workspaceId }));
-  const tasks = state.tasks.map((row) => ({ ...row, workspaceId }));
-  const sources = state.sources.map((row) => ({ ...row, workspaceId }));
-  const ingestRuns = state.ingestRuns.map((row) => ({ ...row, workspaceId }));
+  const bots = state.bots.map((row) => ({ ...definedRow(row), workspaceId }));
+  const routines = state.routines.map((row) => ({ ...definedRow(row), workspaceId }));
+  const runs = state.runs.map((row) => ({ ...definedRow(row), workspaceId }));
+  const tasks = state.tasks.map((row) => ({ ...definedRow(row), workspaceId }));
+  const sources = state.sources.map((row) => ({ ...definedRow(row), workspaceId }));
+  const ingestRuns = state.ingestRuns.map((row) => ({ ...definedRow(row), workspaceId }));
+  const instructions = (state.instructions ?? []).map((row) => ({ ...definedRow(row), workspaceId }));
   if (bots.length > LIMITS.bots) throw new Error("bots exceeds the ingest limit");
   if (routines.length > LIMITS.routines) throw new Error("routines exceeds the ingest limit");
   if (runs.length > LIMITS.runs) throw new Error("runs exceeds the ingest limit");
@@ -122,6 +138,7 @@ export async function writeState(ctx: MutationCtx, workspaceId: WorkspaceId, sta
   if (sources.length > LIMITS.sources) throw new Error("sources exceeds the ingest limit");
   if (ingestRuns.length > LIMITS.ingestRuns) throw new Error("ingestRuns exceeds the ingest limit");
   if (state.syncLinks.length > LIMITS.syncLinks) throw new Error("syncLinks exceeds the ingest limit");
+  if (instructions.length > LIMITS.instructions) throw new Error("instructions exceeds the ingest limit");
 
   const existingBots = await ctx.db
     .query("bots")
@@ -151,6 +168,10 @@ export async function writeState(ctx: MutationCtx, workspaceId: WorkspaceId, sta
     .query("syncLinks")
     .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
     .take(LIMITS.syncLinks);
+  const existingInstructions = await ctx.db
+    .query("instructions")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.instructions);
   capped(existingBots.length, LIMITS.bots, true, "bots");
   capped(existingRoutines.length, LIMITS.routines, true, "routines");
   capped(existingRuns.length, LIMITS.runs, true, "runs");
@@ -158,6 +179,7 @@ export async function writeState(ctx: MutationCtx, workspaceId: WorkspaceId, sta
   capped(existingSources.length, LIMITS.sources, true, "sources");
   capped(existingIngest.length, LIMITS.ingestRuns, true, "ingestRuns");
   capped(existingLinks.length, LIMITS.syncLinks, true, "syncLinks");
+  capped(existingInstructions.length, LIMITS.instructions, true, "instructions");
 
   await replaceByKey(existingBots, bots, {
     remove: (id) => ctx.db.delete(id),
@@ -188,6 +210,11 @@ export async function writeState(ctx: MutationCtx, workspaceId: WorkspaceId, sta
     remove: (id) => ctx.db.delete(id),
     patch: (id, row) => ctx.db.patch(id, row),
     insert: (row) => ctx.db.insert("ingestRuns", row),
+  });
+  await replaceByKey(existingInstructions, instructions, {
+    remove: (id) => ctx.db.delete(id),
+    patch: (id, row) => ctx.db.patch(id, row),
+    insert: (row) => ctx.db.insert("instructions", row),
   });
 
   const links = [];
