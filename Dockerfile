@@ -10,8 +10,10 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ARG NEXT_PUBLIC_CONVEX_URL
+ARG CONVEX_DEPLOY_KEY
 ENV NEXT_PUBLIC_CONVEX_URL=$NEXT_PUBLIC_CONVEX_URL
-RUN pnpm build
+# CONVEX_DEPLOY_KEY selects the deployment. Push functions, confirm them, then build Next.js.
+RUN CONVEX_DEPLOY_KEY="$CONVEX_DEPLOY_KEY" sh -eu -c 'pnpm exec convex deploy --typecheck enable --codegen enable && pnpm exec tsx scripts/check-deployed-functions.ts && pnpm build'
 
 FROM base AS runner
 ENV NODE_ENV=production

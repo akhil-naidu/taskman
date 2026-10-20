@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
+    "check:convex": "tsx scripts/check-convex-module-paths.ts && convex typecheck",
     "push-fleet": "tsx scripts/push-fleet.ts",
     "freeze-example": "tsx scripts/freeze-example.ts"
   },

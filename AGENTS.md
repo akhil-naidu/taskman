@@ -27,3 +27,9 @@ Do not merge, mark a pull request ready for review, push to `master`, or deploy.
 ## Commits
 
 Follow Conventional Commits. Read `.cursor/skills/conventional-commits/SKILL.md` before writing a commit message, pull request title, or squash-merge title.
+
+## Convex modules and release
+
+Convex module path components may contain only letters, numbers, underscores, and periods. A hyphen, as in `model/setup-prompt.ts`, makes `npx convex deploy` fail with InvalidConfig, so new functions such as `workspaces:reset` never publish. CI runs `pnpm check:convex` on every pull request: it rejects those paths and runs `npx convex typecheck`. `npx convex codegen` needs a deployment, so the release image runs codegen inside `npx convex deploy` instead of on pull requests.
+
+The Docker image build runs `npx convex deploy` with `CONVEX_DEPLOY_KEY`, then checks that `workspaces:reset` is a public function, then runs `pnpm build`. A failed push fails the image. Do not run that deploy from an agent session, and do not set `CONVEX_DEPLOYMENT` in the image build. The key alone selects the deployment.

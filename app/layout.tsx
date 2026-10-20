@@ -1,5 +1,6 @@
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { Suspense, type ReactNode } from "react";
 import { ClientProvider } from "@/components/client-provider";
 import "./globals.css";
@@ -35,5 +36,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
 async function AuthShell({ children }: { children: ReactNode }) {
   const tree = <ClientProvider siteUrl={process.env.SITE_URL ?? ""}>{children}</ClientProvider>;
   if (!process.env.NEXT_PUBLIC_CONVEX_URL) return tree;
+  // The auth provider calls Date.now() for server state. Wait for the request so / and /signin can prerender.
+  await connection();
   return <ConvexAuthNextjsServerProvider>{tree}</ConvexAuthNextjsServerProvider>;
 }

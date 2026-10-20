@@ -2,7 +2,7 @@ import { LIMITS } from "../persist";
 import { boardColumn } from "./columns";
 import { isWriteTool } from "./oauth";
 import { botKey, orgColor, orgSlug } from "./orgs";
-import { newBotSetupSection } from "./setup-prompt";
+import { newBotSetupSection } from "./setupPrompt";
 import { emptyState } from "./store";
 import { stableHash, urgencyFor } from "./text";
 import type { BotRow, BotStatus, FleetState, TaskRow, TaskStatus } from "./types";
