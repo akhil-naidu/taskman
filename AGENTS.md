@@ -23,3 +23,7 @@ Before changing behavior:
 Check the specs with `npx @fission-ai/openspec validate --all --strict`.
 
 Do not merge, mark a pull request ready for review, push to `master`, or deploy. Do not put real bot names, fleet data, or secrets in the repo, fixtures, commits, or pull request text.
+
+## Commits
+
+Follow Conventional Commits. Read `.cursor/skills/conventional-commits/SKILL.md` before writing a commit message, pull request title, or squash-merge title.
