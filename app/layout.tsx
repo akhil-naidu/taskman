@@ -1,5 +1,6 @@
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import type { Metadata } from "next";
+import { Suspense, type ReactNode } from "react";
 import { ClientProvider } from "@/components/client-provider";
 import "./globals.css";
 import { Geist } from "next/font/google";
@@ -12,8 +13,8 @@ export const metadata: Metadata = {
   description: "Fleet and board for a group of assistant bots",
 };
 
-export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const tree = (
+export default function RootLayout({ children }: LayoutProps<"/">) {
+  return (
     <html lang="en" data-theme="dark" className={cn("dark h-full antialiased", "font-sans", geist.variable)} suppressHydrationWarning>
       <head>
         <script
@@ -23,10 +24,16 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         />
       </head>
       <body className="min-h-full">
-        <ClientProvider>{children}</ClientProvider>
+        <Suspense fallback={<p className="p-6 text-sm text-[var(--mu)]">Loading…</p>}>
+          <AuthShell>{children}</AuthShell>
+        </Suspense>
       </body>
     </html>
   );
+}
+
+async function AuthShell({ children }: { children: ReactNode }) {
+  const tree = <ClientProvider>{children}</ClientProvider>;
   if (!process.env.NEXT_PUBLIC_CONVEX_URL) return tree;
   return <ConvexAuthNextjsServerProvider>{tree}</ConvexAuthNextjsServerProvider>;
 }
