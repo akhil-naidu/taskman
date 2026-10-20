@@ -1,0 +1,26 @@
+schema: spec-driven
+
+context: |
+  taskman is a multi-tenant Next.js App Router, TypeScript, and Convex app, installed with pnpm, meant to run on Railway later.
+  Anyone can sign up and create a workspace. Fleet data, ingest tokens, and tracker credentials belong to that workspace.
+  It gives a fleet of assistant bots a board: fleet visibility, box hygiene, task ownership and org boundaries, then read-only sync with ClickUp, GitHub Issues, Linear, and Jira.
+  Integration tokens are encrypted per workspace. Do not add CLICKUP_API_TOKEN-style env vars. Platform env vars are the Convex deploy key, Convex Auth secrets, and TASKMAN_ENCRYPTION_KEY.
+  The box stays the source of truth. The hosted app never reads it. A push script upserts a snapshot.
+  Board times are IST.
+  Draft pull requests only. Never merge, mark ready for review, push to master, or deploy.
+  No Railway deploys, no production Convex deploy, and no Railway or Convex setting changes.
+  No paid API calls.
+  No real bot names, fleet data, or secrets in the repo, fixtures, commits, or pull request text.
+  Fixtures use bot-a and bot-b. Pull request text is neutral and has no attribution lines.
+  Read openspec/project.md before a change. New behavior needs proposal.md, tasks.md, and spec deltas before feature code.
+
+rules:
+  proposal:
+    - State what is out of scope
+    - Do not include real bot names, fleet data, secrets, or attribution
+  specs:
+    - Use SHALL or MUST, and give each requirement at least one scenario
+    - Describe observable behavior
+  tasks:
+    - Use numbered checkboxes
+    - Include how to verify the task

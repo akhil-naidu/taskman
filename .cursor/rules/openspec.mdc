@@ -1,0 +1,10 @@
+---
+description: OpenSpec-first workflow and standing taskman constraints
+alwaysApply: true
+---
+
+# OpenSpec
+
+Read `openspec/project.md` before a behavior change. Propose `openspec/changes/<name>/proposal.md`, `tasks.md`, and spec deltas before feature code. Implement from `tasks.md`. Keep `openspec/specs/` in sync.
+
+Draft pull requests only. Do not merge, mark ready for review, push to `master`, or deploy. No paid API calls. No real bot names, fleet data, or secrets. Fixtures use `bot-a` and `bot-b`.
