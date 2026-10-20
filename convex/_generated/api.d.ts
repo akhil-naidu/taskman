@@ -15,6 +15,7 @@ import type * as guard from "../guard.js";
 import type * as http from "../http.js";
 import type * as ingest from "../ingest.js";
 import type * as ingestTokens from "../ingestTokens.js";
+import type * as mcp from "../mcp.js";
 import type * as model_auth from "../model/auth.js";
 import type * as model_clock from "../model/clock.js";
 import type * as model_orgs from "../model/orgs.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   ingest: typeof ingest;
   ingestTokens: typeof ingestTokens;
+  mcp: typeof mcp;
   "model/auth": typeof model_auth;
   "model/clock": typeof model_clock;
   "model/orgs": typeof model_orgs;

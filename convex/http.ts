@@ -1,9 +1,20 @@
 import { httpRouter } from "convex/server";
 import { auth } from "./auth";
+import {
+  bearerToken,
+  blankState,
+  handleMcpMessage,
+  mcpHttpBody,
+  methodOf,
+  needsToken,
+  originAllowed,
+  protocolVersionAllowed,
+} from "./model/mcp";
 import { sha256Hex } from "./model/secrets";
-import type { FleetSnapshot } from "./model/types";
+import type { FleetSnapshot, FleetState } from "./model/types";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 
 const http = httpRouter();
 auth.addHttpRoutes(http);
@@ -46,6 +57,61 @@ http.route({
     }
   }),
 });
+
+http.route({
+  path: "/mcp",
+  method: "GET",
+  handler: httpAction(async () => new Response(null, { status: 405, headers: { Allow: "POST" } })),
+});
+
+http.route({
+  path: "/mcp",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!originAllowed(request.headers.get("origin"), process.env.SITE_URL)) {
+      return Response.json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "origin rejected" } }, { status: 403 });
+    }
+    if (!protocolVersionAllowed(request.headers.get("mcp-protocol-version"))) {
+      return Response.json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "unsupported protocol version" } }, { status: 400 });
+    }
+    let message: unknown;
+    try {
+      message = await request.json();
+    } catch {
+      message = null;
+    }
+    const method = methodOf(message);
+    let token: { canWrite: boolean } | null = null;
+    let state: FleetState = blankState();
+    let workspaceId: Id<"workspaces"> | null = null;
+    if (needsToken(method)) {
+      const raw = bearerToken(request.headers.get("authorization"));
+      const tokenHash = raw ? await sha256Hex(raw) : "";
+      const match = tokenHash ? await ctx.runQuery(internal.ingestTokens.lookup, { tokenHash }) : null;
+      if (!match) {
+        const outcome = handleMcpMessage(message, null, state);
+        return mcpResponse(request, outcome);
+      }
+      token = { canWrite: match.canWrite };
+      workspaceId = match.workspaceId;
+      state = await ctx.runQuery(internal.mcp.load, { workspaceId: match.workspaceId });
+    }
+    const outcome = handleMcpMessage(message, token, state);
+    if (outcome.nextState && workspaceId) {
+      await ctx.runMutation(internal.mcp.save, { workspaceId, state: outcome.nextState });
+    }
+    return mcpResponse(request, outcome);
+  }),
+});
+
+function mcpResponse(request: Request, outcome: ReturnType<typeof handleMcpMessage>) {
+  const packed = mcpHttpBody(request.headers.get("accept") ?? "", outcome);
+  if (packed.body === null) return new Response(null, { status: packed.status });
+  return new Response(packed.body, {
+    status: packed.status,
+    headers: packed.contentType ? { "Content-Type": packed.contentType } : undefined,
+  });
+}
 
 http.route({
   path: "/oauth/callback",

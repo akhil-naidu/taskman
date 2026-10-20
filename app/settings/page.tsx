@@ -2,8 +2,9 @@
 
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation, useQuery } from "convex/react";
-import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { Shell } from "@/components/shell";
+import { activeWorkspace, useWorkspaceSelection } from "@/components/workspace-selection";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 
@@ -16,33 +17,25 @@ const PROVIDERS = [
 ] as const;
 
 export default function SettingsPage() {
-  if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
-    return <p className="p-6 text-sm text-[var(--mu)]">Set NEXT_PUBLIC_CONVEX_URL to manage a workspace.</p>;
-  }
-  return <SettingsLive />;
+  return (
+    <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">Loading…</p>}>
+      <Shell current="settings">
+        {process.env.NEXT_PUBLIC_CONVEX_URL ? <SettingsLive /> : <p className="p-6 text-sm text-muted-foreground">Set NEXT_PUBLIC_CONVEX_URL to manage a workspace.</p>}
+      </Shell>
+    </Suspense>
+  );
 }
 
 function SettingsLive() {
   const workspaces = useQuery(api.workspaces.list, {});
-  const [workspaceId, setWorkspaceId] = useState<Id<"workspaces"> | "">("");
-  const selected = workspaceId || rememberedWorkspace(workspaces) || workspaces?.[0]?.id || "";
-
-  function choose(id: Id<"workspaces">) {
-    setWorkspaceId(id);
-    window.localStorage.setItem("taskman-workspace", id);
-  }
+  const { workspaceId, setWorkspaceId } = useWorkspaceSelection();
+  const selected = activeWorkspace(workspaces, workspaceId);
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <div className="mb-6 flex items-center gap-3">
-        <Link href="/" className="text-sm text-[var(--mu)]">
-          Fleet
-        </Link>
-        <h1 className="text-xl font-semibold">Settings</h1>
-      </div>
-      <WorkspaceSection workspaces={workspaces} selected={selected} onChoose={choose} />
+    <main className="mx-auto max-w-3xl px-4 py-6">
+      <h1 className="mb-4 text-base font-semibold">Settings</h1>
+      <WorkspaceSection workspaces={workspaces} selected={selected} onChoose={setWorkspaceId} />
       {selected ? <CredentialSection workspaceId={selected} /> : null}
-      {selected ? <IngestSection workspaceId={selected} /> : null}
     </main>
   );
 }
@@ -54,7 +47,7 @@ function WorkspaceSection({
 }: {
   workspaces: { id: Id<"workspaces">; name: string }[] | undefined;
   selected: Id<"workspaces"> | "";
-  onChoose: (id: Id<"workspaces">) => void;
+  onChoose: (id: string) => void;
 }) {
   const create = useMutation(api.workspaces.create);
   const { signOut } = useAuthActions();
@@ -75,7 +68,7 @@ function WorkspaceSection({
           <select
             className={`${fieldClass} mt-1`}
             value={selected}
-            onChange={(event) => onChoose(event.target.value as Id<"workspaces">)}
+            onChange={(event) => onChoose(event.target.value)}
           >
             {workspaces.map((workspace) => (
               <option key={workspace.id} value={workspace.id}>
@@ -227,64 +220,6 @@ function ProviderForm({
       </div>
     </form>
   );
-}
-
-function IngestSection({ workspaceId }: { workspaceId: Id<"workspaces"> }) {
-  const tokens = useQuery(api.ingestTokens.list, { workspaceId });
-  const create = useMutation(api.ingestTokens.create);
-  const revoke = useMutation(api.ingestTokens.revoke);
-  const [name, setName] = useState("");
-  const [fresh, setFresh] = useState("");
-
-  return (
-    <section className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4">
-      <h2 className="text-sm font-semibold">Ingest tokens</h2>
-      <p className="mt-1 text-sm text-[var(--mu)]">The raw token is shown once. Pushes that present it write only this workspace.</p>
-      {fresh ? (
-        <p className="mt-3 break-all rounded-lg border border-[var(--line)] bg-[var(--panel2)] px-3 py-2 text-sm">
-          Copy this token now. It will not be shown again.
-          <span className="mt-1 block font-mono text-xs">{fresh}</span>
-        </p>
-      ) : null}
-      <form
-        className="mt-3 flex gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void create({ workspaceId, name }).then((result) => {
-            setFresh(result.token);
-            setName("");
-          });
-        }}
-      >
-        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Source name" className={fieldClass} />
-        <button type="submit" className={buttonClass}>
-          Create token
-        </button>
-      </form>
-      <ul className="mt-3 flex flex-col gap-2">
-        {tokens?.map((token) => (
-          <li key={token.id} className="flex items-center justify-between gap-2 text-sm">
-            <span>
-              {token.name} ····{token.hint}
-              {token.revokedAt ? " · revoked" : ""}
-            </span>
-            {token.revokedAt ? null : (
-              <button type="button" className={buttonClass} onClick={() => void revoke({ workspaceId, tokenId: token.id })}>
-                Revoke
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function rememberedWorkspace(workspaces: { id: Id<"workspaces"> }[] | undefined): Id<"workspaces"> | "" {
-  if (!workspaces || typeof window === "undefined") return "";
-  const stored = window.localStorage.getItem("taskman-workspace");
-  if (stored && workspaces.some((workspace) => workspace.id === stored)) return stored as Id<"workspaces">;
-  return "";
 }
 
 function readSavedConfig(config?: string) {

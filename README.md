@@ -93,11 +93,21 @@ pnpm push-fleet -- --root fixtures/fleet --dry-run
 pnpm push-fleet -- --root fixtures/fleet --token '<workspace ingest token>'
 ```
 
-The live command reads `TASKMAN_INGEST_URL` and a workspace ingest token passed with `--token`. It sends `x-taskman-token`. Create that token in Settings. The server stores only a hash, and the push writes only that workspace. Posting the same snapshot twice upserts by stable keys and does not create duplicate bots, routines, tasks, or sync links.
+The live command reads `TASKMAN_INGEST_URL` and a workspace ingest token passed with `--token`. It sends `x-taskman-token`. Create that token on the Connections page. The server stores only a hash, and the push writes only that workspace. Posting the same snapshot twice upserts by stable keys and does not create duplicate bots, routines, tasks, or sync links.
 
 The HTTP route is `POST /ingest`. A Convex mutation, `ingestFleet`, checks the same workspace token when a caller uses the Convex client instead of HTTP. Prefer the HTTP route. A missing, unknown, or revoked token is rejected.
 
 Lists are capped (200 bots, 500 tasks). An ingest that would pass the cap fails instead of dropping rows.
+
+## Grok Bot connector
+
+TaskMan is a remote MCP server. Add it to a Grok Bot as a connector.
+
+- Path: `https://<deployment>.convex.site/mcp`
+- Transport: streamable HTTP
+- Header: `Authorization: Bearer <workspace source token>`
+
+Create the token on the Connections page of the workspace the bot should see. Leave write off for a read-only connector. The read tools are `list_bots`, `get_bot`, `list_tasks`, `get_task`, `list_waiting_on_owner`, and `list_conflicts`. A token with the write grant can also call `claim_task`, `update_task_status`, and `report_bot_status`. Every tool uses that token's workspace only. `GET /mcp` returns 405. The server answers one JSON-RPC message and does not keep a session.
 
 ## Sync
 

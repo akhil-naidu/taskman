@@ -15,6 +15,7 @@ export const list = query({
       id: row._id,
       name: row.name,
       hint: row.hint,
+      canWrite: row.canWrite === true,
       revokedAt: row.revokedAt ?? null,
       createdAt: row.createdAt,
     }));
@@ -22,21 +23,23 @@ export const list = query({
 });
 
 export const create = mutation({
-  args: { workspaceId: v.id("workspaces"), name: v.string() },
+  args: { workspaceId: v.id("workspaces"), name: v.string(), canWrite: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
     await requireMember(ctx, args.workspaceId);
     const name = args.name.trim().slice(0, 80);
     if (!name) throw new Error("Name is required");
     const token = randomToken();
     const tokenHash = await sha256Hex(token);
+    const canWrite = args.canWrite === true;
     await ctx.db.insert("ingestTokens", {
       workspaceId: args.workspaceId,
       name,
       tokenHash,
       hint: token.slice(-4),
+      canWrite,
       createdAt: Date.now(),
     });
-    return { token, hint: token.slice(-4) };
+    return { token, hint: token.slice(-4), canWrite };
   },
 });
 
@@ -59,6 +62,6 @@ export const lookup = internalQuery({
       .withIndex("by_tokenHash", (q) => q.eq("tokenHash", args.tokenHash))
       .unique();
     if (!row || row.revokedAt) return null;
-    return { workspaceId: row.workspaceId };
+    return { workspaceId: row.workspaceId, canWrite: row.canWrite === true };
   },
 });

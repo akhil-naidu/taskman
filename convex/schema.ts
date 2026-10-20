@@ -59,6 +59,7 @@ export default defineSchema({
     name: v.string(),
     tokenHash: v.string(),
     hint: v.string(),
+    canWrite: v.optional(v.boolean()),
     revokedAt: v.optional(v.number()),
     createdAt: v.number(),
   })
@@ -80,6 +81,7 @@ export default defineSchema({
     openItems: v.array(v.string()),
     activity: v.array(v.string()),
     notes: v.array(v.string()),
+    reportedStatus: v.optional(v.union(v.literal("waiting"), v.literal("active"), v.literal("routine"), v.literal("on-demand"))),
     updatedAt: v.number(),
   })
     .index("by_workspace", ["workspaceId"])

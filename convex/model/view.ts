@@ -59,7 +59,7 @@ export function rowsToView(state: FleetState, now: number, truncated = false): F
       openItems: bot.openItems,
       activity: bot.activity,
       notes: bot.notes,
-      status: deriveStatus(bot, routines.length, today),
+      status: bot.reportedStatus ?? deriveStatus(bot, routines.length, today),
       currentWork: current?.title || bot.openItems[0] || "—",
     };
   });

@@ -1,8 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { Shell } from "@/components/shell";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { formatIst } from "@/convex/model/clock";
 import { orgSlug } from "@/convex/model/orgs";
 import type { BotView, FleetView, SyncProvider, TaskView } from "@/convex/model/types";
@@ -54,67 +56,57 @@ export function Dashboard({
     router.replace(next, { scroll: false });
   }
 
-  function toggleTheme() {
-    const current = document.documentElement.dataset.theme === "light" ? "light" : "dark";
-    const next = current === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
-    localStorage.setItem("taskman-theme", next);
+  const view = searchParams.get("view") === "list" ? "list" : "board";
+
+  function chooseView(next: "board" | "list") {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "board") params.delete("view");
+    else params.set("view", "list");
+    const href = params.size ? `${pathname}?${params}` : pathname;
+    router.replace(href, { scroll: false });
   }
 
-  const orgQuery = selected === "all" ? "" : `?org=${encodeURIComponent(selected)}`;
-
   return (
-    <div className="min-h-screen md:grid md:grid-cols-[220px_1fr]">
-      <aside className="border-b border-[var(--line)] bg-[var(--panel)] px-3 py-3 md:sticky md:top-0 md:h-screen md:border-r md:border-b-0 md:px-3 md:py-5">
-        <div className="hidden items-center gap-2 px-2 pb-4 font-semibold md:flex">
-          <span className="inline-block h-5 w-5 rounded-md bg-gradient-to-br from-[#7c7cff] to-[#f97316]" />
-          taskman
-        </div>
-        <p className="px-2 pb-2 text-[11px] tracking-wide text-[var(--mu)] uppercase">Orgs</p>
-        <nav className="flex gap-1 overflow-x-auto md:flex-col">
-          <OrgButton name="All" count={model.bots.length} color="var(--ac)" pressed={selected === "all"} onClick={() => chooseOrg("all")} />
-          {options.map((option) => (
-            <OrgButton
-              key={option.slug}
-              name={option.name}
-              count={option.count}
-              color={option.color}
-              pressed={selected === option.slug}
-              onClick={() => chooseOrg(option.slug)}
-            />
-          ))}
-        </nav>
-      </aside>
-      <main className="mx-auto w-full max-w-6xl px-4 py-5 md:px-8 md:py-7">
-        <header className="mb-5 flex flex-col gap-3 md:flex-row md:items-center">
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight">{page === "fleet" ? "Fleet" : "Board"}</h1>
-            <p className="text-xs text-[var(--mu)]">Updated {formatIst(model.generatedAt)}</p>
+    <Shell current={page}>
+      <main className="mx-auto w-full max-w-6xl px-4 py-5 md:px-8 md:py-6">
+        <header className="mb-4 flex flex-col gap-3">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="min-w-0">
+              <h1 className="text-base font-semibold tracking-tight">{page === "fleet" ? "Fleet" : "Board"}</h1>
+              <p className="text-xs text-muted-foreground">Updated {formatIst(model.generatedAt)}</p>
+            </div>
+            <div className="md:ml-auto flex flex-col gap-2 sm:flex-row sm:items-center">
+              {page === "board" ? (
+                <div className="flex gap-1" role="group" aria-label="Board layout">
+                  <Button type="button" size="sm" variant={view === "board" ? "secondary" : "outline"} aria-pressed={view === "board"} onClick={() => chooseView("board")}>
+                    Board
+                  </Button>
+                  <Button type="button" size="sm" variant={view === "list" ? "secondary" : "outline"} aria-pressed={view === "list"} onClick={() => chooseView("list")}>
+                    List
+                  </Button>
+                </div>
+              ) : null}
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search bots and tasks"
+                aria-label="Search bots and tasks"
+                className="w-full sm:w-60"
+              />
+            </div>
           </div>
-          <nav className="flex gap-2 text-sm">
-            <Link href={`/${orgQuery}`} className={page === "fleet" ? navOn : navOff}>
-              Fleet
-            </Link>
-            <Link href={`/board${orgQuery}`} className={page === "board" ? navOn : navOff}>
-              Board
-            </Link>
-            {mode === "live" ? (
-              <Link href="/settings" className={navOff}>
-                Settings
-              </Link>
-            ) : null}
-          </nav>
-          <div className="md:ml-auto flex flex-col gap-2 sm:flex-row">
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search bots and tasks"
-              aria-label="Search bots and tasks"
-              className="w-full rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-2 sm:w-60"
-            />
-            <button type="button" onClick={toggleTheme} className={buttonClass}>
-              Toggle theme
-            </button>
+          <div className="flex gap-1 overflow-x-auto" aria-label="Orgs">
+            <OrgButton name="All" count={model.bots.length} color="var(--muted-foreground)" pressed={selected === "all"} onClick={() => chooseOrg("all")} />
+            {options.map((option) => (
+              <OrgButton
+                key={option.slug}
+                name={option.name}
+                count={option.count}
+                color={option.color}
+                pressed={selected === option.slug}
+                onClick={() => chooseOrg(option.slug)}
+              />
+            ))}
           </div>
         </header>
         {mode === "example" ? (
@@ -137,13 +129,14 @@ export function Dashboard({
             selected={selected}
             needle={needle}
             mode={mode}
+            view={view}
             onSync={onSync}
             syncing={syncing}
             syncMessage={syncMessage}
           />
         )}
       </main>
-    </div>
+    </Shell>
   );
 }
 
@@ -188,6 +181,7 @@ function BoardPage({
   selected,
   needle,
   mode,
+  view,
   onSync,
   syncing,
   syncMessage,
@@ -196,6 +190,7 @@ function BoardPage({
   selected: string;
   needle: string;
   mode: "example" | "live";
+  view: "board" | "list";
   onSync?: (provider: SyncProvider) => void;
   syncing: boolean;
   syncMessage?: string;
@@ -210,23 +205,31 @@ function BoardPage({
         </p>
         <div className="flex flex-wrap gap-2 md:ml-auto">
           {PROVIDERS.map((provider) => (
-            <button
+            <Button
               key={provider.id}
               type="button"
-              className={buttonClass}
+              variant="outline"
+              size="sm"
               disabled={mode !== "live" || syncing || !onSync}
               onClick={() => onSync?.(provider.id)}
             >
               {provider.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
       {syncMessage ? (
-        <p className="mb-4 text-sm text-[var(--mu)]" aria-live="polite">
+        <p className="mb-4 text-sm text-muted-foreground" aria-live="polite">
           {syncMessage}
         </p>
       ) : null}
+      {view === "list" ? <TaskList tasks={tasks} /> : <TaskColumns tasks={tasks} />}
+    </>
+  );
+}
+
+function TaskColumns({ tasks }: { tasks: TaskView[] }) {
+  return (
       <div className="grid gap-3 md:grid-cols-4">
         {COLUMNS.map(([status, label]) => {
           const column = tasks.filter((task) => task.status === status);
@@ -246,15 +249,49 @@ function BoardPage({
           );
         })}
       </div>
-    </>
+  );
+}
+
+function TaskList({ tasks }: { tasks: TaskView[] }) {
+  if (tasks.length === 0) {
+    return <p className="rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">Nothing here</p>;
+  }
+  return (
+    <div className="overflow-hidden rounded-md border border-border">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b border-border text-xs text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2 font-medium">Task</th>
+            <th className="px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 font-medium">Owner</th>
+            <th className="px-3 py-2 font-medium">Org</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tasks.map((task) => (
+            <tr key={task.key} className="border-b border-border last:border-b-0">
+              <td className="px-3 py-2">
+                <span className="mr-2 inline-block size-2 rounded-sm align-middle" style={{ background: task.orgColor }} />
+                {task.title}
+                {task.conflict ? <span className="ml-2 text-[10px] tracking-wide text-[var(--hi)] uppercase">Conflict</span> : null}
+              </td>
+              <td className="px-3 py-2 text-muted-foreground">{task.status.replace("_", " ")}</td>
+              <td className="px-3 py-2">{task.ownerLabel}</td>
+              <td className="px-3 py-2">{task.org}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
 function BotCard({ bot }: { bot: BotView }) {
   return (
-    <article className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4" style={{ borderTop: `2px solid ${bot.orgColor}` }}>
+    <article className="overflow-hidden rounded-md border border-border bg-card p-4">
       <div className="flex items-center gap-2.5">
-        <span className="grid h-8 w-8 place-items-center rounded-lg text-sm font-bold text-white" style={{ background: bot.orgColor }}>
+        <span className="inline-block size-2 shrink-0 rounded-sm" style={{ background: bot.orgColor }} />
+        <span className="grid size-7 place-items-center rounded-md border border-border bg-muted text-xs font-medium">
           {bot.name.slice(0, 1).toUpperCase()}
         </span>
         <div className="min-w-0">
@@ -423,7 +460,3 @@ function Badge({ children, hot = false }: { children: string; hot?: boolean }) {
     </span>
   );
 }
-
-const buttonClass = "rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-sm text-[var(--mu)] disabled:opacity-50";
-const navOn = "rounded-lg bg-[var(--panel2)] px-3 py-1.5 font-medium";
-const navOff = "rounded-lg px-3 py-1.5 text-[var(--mu)]";
