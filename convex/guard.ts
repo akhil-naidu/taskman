@@ -19,3 +19,13 @@ export async function requireMember(ctx: Ctx, workspaceId: Id<"workspaces">): Pr
   if (!member) throw new Error("Unauthorized");
   return userId;
 }
+
+export async function requireOwner(ctx: Ctx, workspaceId: Id<"workspaces">): Promise<Id<"users">> {
+  const userId = await requireUser(ctx);
+  const member = await ctx.db
+    .query("members")
+    .withIndex("by_workspace_user", (q) => q.eq("workspaceId", workspaceId).eq("userId", userId))
+    .unique();
+  if (!member || member.role !== "owner") throw new Error("Unauthorized");
+  return userId;
+}

@@ -2,11 +2,13 @@ import { LIMITS } from "../persist";
 import { boardColumn } from "./columns";
 import { isWriteTool } from "./oauth";
 import { botKey, orgColor, orgSlug } from "./orgs";
+import { newBotSetupSection } from "./setup-prompt";
 import { emptyState } from "./store";
 import { stableHash, urgencyFor } from "./text";
 import type { BotRow, BotStatus, FleetState, TaskRow, TaskStatus } from "./types";
 import { TASK_STATUSES } from "./types";
 import { rowsToView } from "./view";
+import { listUndelivered, markRelayed, parseWebhookUrl, type WebhookUpdate } from "./webhooks";
 
 const BOT_STATUSES: BotStatus[] = ["waiting", "active", "routine", "on-demand"];
 
@@ -23,7 +25,10 @@ export type McpOutcome = {
   httpStatus: number;
   body: JsonRpc | null;
   nextState: FleetState | null;
+  webhookUpdates: WebhookUpdate[];
 };
+
+type WriteResult = { result: ToolResult; nextState: FleetState | null; webhookUpdates?: WebhookUpdate[] };
 
 type ToolResult = {
   content: { type: "text"; text: string }[];
@@ -89,8 +94,8 @@ export function handleMcpMessage(message: unknown, token: McpToken, state: Fleet
   if (body.jsonrpc !== "2.0" || typeof body.method !== "string") {
     return errorOutcome(400, id ?? null, -32600, "Invalid request");
   }
-  if (id === undefined) return { httpStatus: 202, body: null, nextState: null };
-  if (body.method === "notifications/initialized") return { httpStatus: 202, body: null, nextState: null };
+  if (id === undefined) return { httpStatus: 202, body: null, nextState: null, webhookUpdates: [] };
+  if (body.method === "notifications/initialized") return { httpStatus: 202, body: null, nextState: null, webhookUpdates: [] };
   if (body.method === "initialize") {
     return ok(id, {
       protocolVersion: "2025-06-18",
@@ -118,31 +123,34 @@ function callTool(id: unknown, params: unknown, token: { canWrite: boolean }, st
       httpStatus: 200,
       body: { jsonrpc: "2.0", id, result: applied.result },
       nextState: applied.nextState,
+      webhookUpdates: applied.webhookUpdates ?? [],
     };
   }
-  return { httpStatus: 200, body: { jsonrpc: "2.0", id, result: applyRead(name, args, state, now) }, nextState: null };
+  return { httpStatus: 200, body: { jsonrpc: "2.0", id, result: applyRead(name, args, state, now) }, nextState: null, webhookUpdates: [] };
 }
 
 function applyRead(name: string, args: Record<string, unknown>, state: FleetState, now: number): ToolResult {
   const view = rowsToView(state, now);
-  if (name === "list_bots") return result(view.bots.map(publicBot));
+  if (name === "list_bots") return result({ bots: view.bots.map(publicBot) });
   if (name === "get_bot") {
     const bot = view.bots.find((item) => item.key === stringArg(args, "key"));
     return bot ? result(publicBot(bot)) : missing("Bot was not found");
   }
-  if (name === "list_tasks") return result(filterTasks(view.tasks, args).map(publicTask));
+  if (name === "list_tasks") return result({ tasks: filterTasks(view.tasks, args).map(publicTask) });
   if (name === "get_task") {
     const task = view.tasks.find((item) => item.key === stringArg(args, "key"));
     return task ? result(publicTask(task)) : missing("Task was not found");
   }
-  if (name === "list_waiting_on_owner") return result(view.tasks.filter((task) => task.status === "waiting").map(publicTask));
-  if (name === "list_conflicts") return result(view.tasks.filter((task) => task.conflict).map(publicTask));
+  if (name === "list_waiting_on_owner") return result({ tasks: view.tasks.filter((task) => task.status === "waiting").map(publicTask) });
+  if (name === "list_conflicts") return result({ tasks: view.tasks.filter((task) => task.conflict).map(publicTask) });
   if (name === "list_board") return result(boardListing(state));
-  if (name === "get_pending_instructions") return result(pendingInstructions(state, stringArg(args, "bot")));
+  if (name === "get_pending_instructions") return result({ instructions: pendingInstructions(state, stringArg(args, "bot")) });
+  if (name === "list_undelivered") return result(listUndelivered(state));
+  if (name === "get_bot_setup_instructions") return result({ instructions: newBotSetupSection() });
   return missing("Tool was not found");
 }
 
-function applyWrite(name: string, args: Record<string, unknown>, state: FleetState, now: number): { result: ToolResult; nextState: FleetState | null } {
+function applyWrite(name: string, args: Record<string, unknown>, state: FleetState, now: number): WriteResult {
   if (name === "claim_task") return claimTask(args, state, now);
   if (name === "update_task_status") return updateTaskStatus(args, state, now);
   if (name === "report_bot_status") return reportBotStatus(args, state, now);
@@ -154,6 +162,8 @@ function applyWrite(name: string, args: Record<string, unknown>, state: FleetSta
   if (name === "complete_task") return completeTask(args, state, now);
   if (name === "ack_instruction") return ackInstruction(args, state, now);
   if (name === "bulk_import_tasks") return bulkImportTasks(args, state, now);
+  if (name === "set_bot_webhook") return setBotWebhook(args, state, now);
+  if (name === "mark_relayed") return markRelayedTool(args, state, now);
   return { result: missing("Tool was not found"), nextState: null };
 }
 
@@ -242,6 +252,9 @@ function registerBot(args: Record<string, unknown>, state: FleetState, now: numb
   ];
   const openItems = openWork ?? existing?.openItems ?? [];
   const description = "description" in args ? stringArg(args, "description").trim() : (existing?.description ?? "");
+  const webhookRaw = "webhook_url" in args ? stringArg(args, "webhook_url") : "webhookUrl" in args ? stringArg(args, "webhookUrl") : null;
+  const webhookUrl = webhookRaw === null ? null : parseWebhookUrl(webhookRaw);
+  if (webhookRaw !== null && !webhookUrl) return { result: missing("Webhook URL is invalid"), nextState: null };
   const bot: BotRow = {
     key,
     name,
@@ -263,6 +276,10 @@ function registerBot(args: Record<string, unknown>, state: FleetState, now: numb
     ...(existing?.currentTaskKey ? { currentTaskKey: existing.currentTaskKey } : {}),
     ...(existing?.currentTaskText ? { currentTaskText: existing.currentTaskText } : {}),
     ...(existing?.lastHeartbeatAt ? { lastHeartbeatAt: existing.lastHeartbeatAt } : {}),
+    ...(webhookUrl || existing?.webhookConfigured ? { webhookConfigured: true } : {}),
+    ...(existing?.webhookLastDeliveryAt ? { webhookLastDeliveryAt: existing.webhookLastDeliveryAt } : {}),
+    ...(existing?.webhookLastError ? { webhookLastError: existing.webhookLastError } : {}),
+    ...(existing?.relayStatus ? { relayStatus: existing.relayStatus } : {}),
     updatedAt: now,
   };
   const bots = existing ? state.bots.map((item) => (item.key === key ? bot : item)) : [...state.bots, bot];
@@ -285,9 +302,32 @@ function registerBot(args: Record<string, unknown>, state: FleetState, now: numb
       open_work: openItems,
       waiting_on_human: untagged(notes, WAITING_PREFIX),
       memories: untagged(notes, MEMORY_PREFIX),
+      webhookConfigured: bot.webhookConfigured === true,
     }),
     nextState: { ...state, bots, routines: nextRoutines },
+    ...(webhookUrl ? { webhookUpdates: [{ botKey: key, url: webhookUrl }] } : {}),
   };
+}
+
+function setBotWebhook(args: Record<string, unknown>, state: FleetState, now: number): WriteResult {
+  const key = (stringArg(args, "bot") || stringArg(args, "key")).trim();
+  const url = parseWebhookUrl(stringArg(args, "url") || stringArg(args, "webhook_url"));
+  const bot = state.bots.find((item) => item.key === key);
+  if (!bot) return { result: missing("Bot was not found"), nextState: null };
+  if (!url) return { result: missing("Webhook URL is invalid"), nextState: null };
+  const next: BotRow = { ...bot, webhookConfigured: true, updatedAt: now };
+  return {
+    result: result({ key, webhookConfigured: true }),
+    nextState: { ...state, bots: state.bots.map((item) => (item.key === key ? next : item)) },
+    webhookUpdates: [{ botKey: key, url }],
+  };
+}
+
+function markRelayedTool(args: Record<string, unknown>, state: FleetState, now: number): WriteResult {
+  const key = stringArg(args, "key");
+  const marked = markRelayed(state, key, now);
+  if (marked.error) return { result: missing(marked.error), nextState: null };
+  return { result: result({ key, status: "relayed" }), nextState: marked.state };
 }
 
 function heartbeat(args: Record<string, unknown>, state: FleetState, now: number): { result: ToolResult; nextState: FleetState | null } {
@@ -571,6 +611,8 @@ function publicBot(bot: ReturnType<typeof rowsToView>["bots"][number]) {
     heartbeatStatus: bot.heartbeatStatus,
     lastHeartbeatAt: bot.lastHeartbeatAt,
     currentTask: bot.currentTask,
+    webhookConfigured: bot.webhookConfigured,
+    relayStatus: bot.relayStatus,
   };
 }
 
@@ -594,7 +636,8 @@ function publicTask(task: ReturnType<typeof taskViewFromRow> | ReturnType<typeof
   };
 }
 
-function result(data: unknown): ToolResult {
+function result(data: object): ToolResult {
+  if (Array.isArray(data)) throw new Error("structuredContent must be an object");
   return { content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data };
 }
 
@@ -603,11 +646,29 @@ function missing(text: string): ToolResult {
 }
 
 function ok(id: unknown, resultBody: unknown): McpOutcome {
-  return { httpStatus: 200, body: { jsonrpc: "2.0", id, result: resultBody }, nextState: null };
+  return { httpStatus: 200, body: { jsonrpc: "2.0", id, result: resultBody }, nextState: null, webhookUpdates: [] };
 }
 
 function errorOutcome(httpStatus: number, id: unknown, code: number, message: string): McpOutcome {
-  return { httpStatus, body: { jsonrpc: "2.0", id, error: { code, message } }, nextState: null };
+  return { httpStatus, body: { jsonrpc: "2.0", id, error: { code, message } }, nextState: null, webhookUpdates: [] };
+}
+
+export function encryptionUnavailable(outcome: McpOutcome): McpOutcome {
+  const id = outcome.body && typeof outcome.body === "object" && "id" in outcome.body ? outcome.body.id : null;
+  return {
+    httpStatus: 200,
+    body: {
+      jsonrpc: "2.0",
+      id,
+      result: {
+        isError: true,
+        content: [{ type: "text", text: "Encryption key is not set" }],
+        structuredContent: { error: "Encryption key is not set" },
+      },
+    },
+    nextState: null,
+    webhookUpdates: [],
+  };
 }
 
 function stringArg(args: Record<string, unknown>, key: string): string {
@@ -677,9 +738,30 @@ function toolDefinitions() {
           open_work: { type: "array", items: { type: "string" } },
           waiting_on_human: { type: "array", items: { type: "string" } },
           memories: { type: "array", items: { type: "string" } },
+          webhook_url: { type: "string" },
         },
         required: ["name", "role"],
       },
+    },
+    {
+      name: "set_bot_webhook",
+      description: "Set or replace the webhook URL for a bot in this workspace",
+      inputSchema: { type: "object", properties: { bot: { type: "string" }, url: { type: "string" } }, required: ["bot", "url"] },
+    },
+    {
+      name: "get_bot_setup_instructions",
+      description: "Return the setup steps for a bot created after the orchestrator",
+      inputSchema: { type: "object", properties: {} },
+    },
+    {
+      name: "list_undelivered",
+      description: "List webhook events that failed delivery and are waiting for the orchestrator to relay",
+      inputSchema: { type: "object", properties: {} },
+    },
+    {
+      name: "mark_relayed",
+      description: "Mark one undelivered webhook event as relayed to its bot",
+      inputSchema: { type: "object", properties: { key: { type: "string" } }, required: ["key"] },
     },
     {
       name: "bulk_import_tasks",

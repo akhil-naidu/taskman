@@ -88,6 +88,10 @@ const botView = v.object({
   heartbeatStatus: v.string(),
   lastHeartbeatAt: v.number(),
   currentTask: v.string(),
+  webhookConfigured: v.boolean(),
+  webhookLastDeliveryAt: v.number(),
+  webhookLastError: v.string(),
+  relayStatus: v.union(v.literal(""), v.literal("delivered"), v.literal("retrying"), v.literal("undelivered"), v.literal("relayed")),
 });
 
 const taskView = v.object({
@@ -115,6 +119,7 @@ export const fleetViewValidator = v.object({
   generatedAt: v.number(),
   bots: v.array(botView),
   tasks: v.array(taskView),
+  relayWaiting: v.number(),
   instructions: v.array(
     v.object({
       key: v.string(),

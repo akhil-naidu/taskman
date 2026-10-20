@@ -5,6 +5,18 @@ import { useMutation, useQuery } from "convex/react";
 import { Suspense, useState } from "react";
 import { Shell } from "@/components/shell";
 import { activeWorkspace, useWorkspaceSelection } from "@/components/workspace-selection";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 
@@ -30,12 +42,14 @@ function SettingsLive() {
   const workspaces = useQuery(api.workspaces.list, {});
   const { workspaceId, setWorkspaceId } = useWorkspaceSelection();
   const selected = activeWorkspace(workspaces, workspaceId);
+  const current = workspaces?.find((workspace) => workspace.id === selected);
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-6">
       <h1 className="mb-4 text-base font-semibold">Settings</h1>
       <WorkspaceSection workspaces={workspaces} selected={selected} onChoose={setWorkspaceId} />
       {selected ? <CredentialSection workspaceId={selected} /> : null}
+      {selected && current ? <DangerZone workspaceId={selected} name={current.name} role={current.role} /> : null}
     </main>
   );
 }
@@ -236,6 +250,66 @@ function readSavedConfig(config?: string) {
   } catch {
     return empty;
   }
+}
+
+function DangerZone({ workspaceId, name, role }: { workspaceId: Id<"workspaces">; name: string; role: string }) {
+  const reset = useMutation(api.workspaces.reset);
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [message, setMessage] = useState("");
+  if (role !== "owner") return null;
+  const matches = typed.trim() === name;
+
+  return (
+    <section className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4">
+      <h2 className="text-sm font-semibold">Danger zone</h2>
+      <p className="mt-1 text-sm text-[var(--mu)]">
+        Reset deletes this workspace&apos;s tasks, bots, instructions, webhooks, delivery logs, and imported board data. The account, this workspace, and integration connections stay.
+      </p>
+      <AlertDialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) {
+            setTyped("");
+            setMessage("");
+          }
+        }}
+      >
+        <Button type="button" variant="destructive" className="mt-3" onClick={() => setOpen(true)}>
+          Reset workspace
+        </Button>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset workspace</AlertDialogTitle>
+            <AlertDialogDescription>
+              Type {name} to delete tasks, bots, instructions, webhooks, delivery logs, and imported board data for this workspace.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input value={typed} onChange={(event) => setTyped(event.target.value)} aria-label="Workspace name" autoComplete="off" />
+          {message ? <p className="text-sm text-destructive">{message}</p> : null}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={!matches}
+              onClick={() => {
+                void reset({ workspaceId, name: typed.trim() })
+                  .then(() => {
+                    setOpen(false);
+                    setTyped("");
+                    setMessage("");
+                  })
+                  .catch(() => setMessage("Reset failed"));
+              }}
+            >
+              Reset workspace
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </section>
+  );
 }
 
 const fieldClass = "w-full rounded-lg border border-[var(--line)] bg-[var(--panel2)] px-3 py-2 text-sm";

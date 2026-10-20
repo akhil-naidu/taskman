@@ -97,9 +97,9 @@ function LiveDashboard({ page }: { page: "fleet" | "board" | "bots" }) {
         if (!selected) return;
         void answer({ workspaceId: selected, key, answer: value }).catch(() => setSyncMessage("Could not save that answer"));
       }}
-      onQueue={(body) => {
+      onQueue={(body, botKey) => {
         if (!selected) return;
-        void queue({ workspaceId: selected, body }).catch(() => setSyncMessage("Could not queue that instruction"));
+        void queue({ workspaceId: selected, body, ...(botKey ? { botKey } : {}) }).catch(() => setSyncMessage("Could not queue that instruction"));
       }}
     />
   );

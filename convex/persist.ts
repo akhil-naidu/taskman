@@ -1,5 +1,6 @@
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { DELIVERY_LIMIT } from "./model/webhooks";
 import type { FleetState } from "./model/types";
 
 type ReadCtx = Pick<QueryCtx, "db">;
@@ -14,6 +15,7 @@ export const LIMITS = {
   syncLinks: 500,
   ingestRuns: 20,
   instructions: 200,
+  deliveries: DELIVERY_LIMIT,
 } as const;
 
 function strip<T extends { _id: string; _creationTime: number; workspaceId: string }>(doc: T) {
@@ -95,6 +97,10 @@ export async function loadState(
     .query("instructions")
     .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
     .take(LIMITS.instructions);
+  const deliveries = await ctx.db
+    .query("webhookDeliveries")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.deliveries);
   const truncated =
     capped(bots.length, LIMITS.bots, strict, "bots") ||
     capped(routines.length, LIMITS.routines, strict, "routines") ||
@@ -103,7 +109,8 @@ export async function loadState(
     capped(sources.length, LIMITS.sources, strict, "sources") ||
     capped(syncLinks.length, LIMITS.syncLinks, strict, "syncLinks") ||
     capped(ingestRuns.length, LIMITS.ingestRuns, strict, "ingestRuns") ||
-    capped(instructions.length, LIMITS.instructions, strict, "instructions");
+    capped(instructions.length, LIMITS.instructions, strict, "instructions") ||
+    capped(deliveries.length, LIMITS.deliveries, strict, "deliveries");
   return {
     truncated,
     state: {
@@ -119,6 +126,7 @@ export async function loadState(
       }),
       ingestRuns: ingestRuns.map((doc) => strip(doc)),
       instructions: instructions.map((doc) => strip(doc)),
+      deliveries: deliveries.map((doc) => strip(doc)),
     },
   };
 }
@@ -131,6 +139,7 @@ export async function writeState(ctx: MutationCtx, workspaceId: WorkspaceId, sta
   const sources = state.sources.map((row) => ({ ...definedRow(row), workspaceId }));
   const ingestRuns = state.ingestRuns.map((row) => ({ ...definedRow(row), workspaceId }));
   const instructions = (state.instructions ?? []).map((row) => ({ ...definedRow(row), workspaceId }));
+  const deliveries = (state.deliveries ?? []).map((row) => ({ ...definedRow(row), workspaceId }));
   if (bots.length > LIMITS.bots) throw new Error("bots exceeds the ingest limit");
   if (routines.length > LIMITS.routines) throw new Error("routines exceeds the ingest limit");
   if (runs.length > LIMITS.runs) throw new Error("runs exceeds the ingest limit");
@@ -139,6 +148,7 @@ export async function writeState(ctx: MutationCtx, workspaceId: WorkspaceId, sta
   if (ingestRuns.length > LIMITS.ingestRuns) throw new Error("ingestRuns exceeds the ingest limit");
   if (state.syncLinks.length > LIMITS.syncLinks) throw new Error("syncLinks exceeds the ingest limit");
   if (instructions.length > LIMITS.instructions) throw new Error("instructions exceeds the ingest limit");
+  if (deliveries.length > LIMITS.deliveries) throw new Error("deliveries exceeds the ingest limit");
 
   const existingBots = await ctx.db
     .query("bots")
@@ -172,6 +182,10 @@ export async function writeState(ctx: MutationCtx, workspaceId: WorkspaceId, sta
     .query("instructions")
     .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
     .take(LIMITS.instructions);
+  const existingDeliveries = await ctx.db
+    .query("webhookDeliveries")
+    .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+    .take(LIMITS.deliveries);
   capped(existingBots.length, LIMITS.bots, true, "bots");
   capped(existingRoutines.length, LIMITS.routines, true, "routines");
   capped(existingRuns.length, LIMITS.runs, true, "runs");
@@ -180,6 +194,7 @@ export async function writeState(ctx: MutationCtx, workspaceId: WorkspaceId, sta
   capped(existingIngest.length, LIMITS.ingestRuns, true, "ingestRuns");
   capped(existingLinks.length, LIMITS.syncLinks, true, "syncLinks");
   capped(existingInstructions.length, LIMITS.instructions, true, "instructions");
+  capped(existingDeliveries.length, LIMITS.deliveries, true, "deliveries");
 
   await replaceByKey(existingBots, bots, {
     remove: (id) => ctx.db.delete(id),
@@ -215,6 +230,11 @@ export async function writeState(ctx: MutationCtx, workspaceId: WorkspaceId, sta
     remove: (id) => ctx.db.delete(id),
     patch: (id, row) => ctx.db.patch(id, row),
     insert: (row) => ctx.db.insert("instructions", row),
+  });
+  await replaceByKey(existingDeliveries, deliveries, {
+    remove: (id) => ctx.db.delete(id),
+    patch: (id, row) => ctx.db.patch(id, row),
+    insert: (row) => ctx.db.insert("webhookDeliveries", row),
   });
 
   const links = [];

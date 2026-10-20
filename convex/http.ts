@@ -3,14 +3,17 @@ import { auth } from "./auth";
 import {
   bearerToken,
   blankState,
+  encryptionUnavailable,
   handleMcpMessage,
   mcpHttpBody,
   methodOf,
   needsToken,
   originAllowed,
   protocolVersionAllowed,
+  type McpOutcome,
 } from "./model/mcp";
 import { sha256Hex } from "./model/secrets";
+import { newPendingKeys, sealWebhookUpdates } from "./model/webhooks";
 import type { FleetSnapshot, FleetState } from "./model/types";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -97,14 +100,22 @@ http.route({
       state = await ctx.runQuery(internal.mcp.load, { workspaceId: match.workspaceId });
     }
     const outcome = handleMcpMessage(message, token, state);
-    if (outcome.nextState && workspaceId) {
-      await ctx.runMutation(internal.mcp.save, { workspaceId, state: outcome.nextState });
+    if (workspaceId && (outcome.nextState || outcome.webhookUpdates.length > 0)) {
+      const material = process.env.TASKMAN_ENCRYPTION_KEY;
+      if (outcome.webhookUpdates.length > 0 && !material) return mcpResponse(request, encryptionUnavailable(outcome));
+      const sealed = outcome.webhookUpdates.length > 0 && material ? await sealWebhookUpdates(outcome.webhookUpdates, material) : [];
+      await ctx.runMutation(internal.webhooks.commit, {
+        workspaceId,
+        state: outcome.nextState,
+        sealed,
+        deliveryKeys: outcome.nextState ? newPendingKeys(state, outcome.nextState) : [],
+      });
     }
     return mcpResponse(request, outcome);
   }),
 });
 
-function mcpResponse(request: Request, outcome: ReturnType<typeof handleMcpMessage>) {
+function mcpResponse(request: Request, outcome: McpOutcome) {
   const packed = mcpHttpBody(request.headers.get("accept") ?? "", outcome);
   if (packed.body === null) return new Response(null, { status: packed.status });
   return new Response(packed.body, {

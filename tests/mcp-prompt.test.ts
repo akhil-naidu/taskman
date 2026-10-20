@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { newBotSetupSection } from "../convex/model/setup-prompt";
 import { mcpEndpoint, mcpSetupPrompt, onboardingStorageKey, resolveSiteOrigin } from "../lib/mcp-prompt";
 
 describe("mcp setup prompt", () => {
@@ -27,7 +28,19 @@ describe("mcp setup prompt", () => {
     expect(prompt).toContain("Waiting on human");
     expect(prompt).toContain("Done");
     expect(prompt).toContain("report_progress");
+    expect(prompt).toContain("orchestrator");
+    expect(prompt).toContain("set_bot_webhook");
+    expect(prompt).toContain("list_undelivered");
+    expect(prompt).toContain("mark_relayed");
+    expect(prompt).toContain("SendToAgent");
+    expect(prompt).toContain("get_bot_setup_instructions");
     expect(prompt.toLowerCase()).not.toContain("twitter");
+    const [orchestrator, laterBot] = prompt.split("New bot setup");
+    expect(orchestrator).toContain("about every 30 minutes");
+    expect(orchestrator).toContain("Do not create a polling routine for that bot");
+    expect(laterBot).toContain("Do not create a polling routine");
+    expect(laterBot).not.toContain("Also create one polling routine");
+    expect(newBotSetupSection()).toBe(`New bot setup${laterBot}`);
   });
 
   it("keys dismissal by workspace", () => {

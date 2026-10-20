@@ -20,7 +20,7 @@ function byKey<T extends { key: string }>(rows: T[]): T[] {
 }
 
 export function emptyState(): FleetState {
-  return { bots: [], routines: [], runs: [], tasks: [], sources: [], syncLinks: [], ingestRuns: [], instructions: [] };
+  return { bots: [], routines: [], runs: [], tasks: [], sources: [], syncLinks: [], ingestRuns: [], instructions: [], deliveries: [] };
 }
 
 function isProvider(value: string): value is Provider {
@@ -55,6 +55,7 @@ function finish(state: FleetState): FleetState {
     syncLinks: byKey(state.syncLinks),
     ingestRuns: byKey(state.ingestRuns),
     instructions: byKey(state.instructions ?? []),
+    deliveries: byKey(state.deliveries ?? []),
   };
 }
 
@@ -110,6 +111,10 @@ export function planSnapshot(
       ...(previous?.currentTaskKey ? { currentTaskKey: previous.currentTaskKey } : {}),
       ...(previous?.currentTaskText ? { currentTaskText: previous.currentTaskText } : {}),
       ...(previous?.lastHeartbeatAt ? { lastHeartbeatAt: previous.lastHeartbeatAt } : {}),
+      ...(previous?.webhookConfigured ? { webhookConfigured: previous.webhookConfigured } : {}),
+      ...(previous?.webhookLastDeliveryAt ? { webhookLastDeliveryAt: previous.webhookLastDeliveryAt } : {}),
+      ...(previous?.webhookLastError ? { webhookLastError: previous.webhookLastError } : {}),
+      ...(previous?.relayStatus ? { relayStatus: previous.relayStatus } : {}),
       updatedAt: now,
     };
   });
@@ -264,6 +269,7 @@ export function planSnapshot(
       },
     ],
     instructions: existing.instructions,
+    deliveries: existing.deliveries ?? [],
   });
 }
 

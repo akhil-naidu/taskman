@@ -20,6 +20,8 @@ const WRITE_TOOLS = new Set([
   "complete_task",
   "ack_instruction",
   "bulk_import_tasks",
+  "set_bot_webhook",
+  "mark_relayed",
 ]);
 
 export type StoredGrant = {

@@ -34,6 +34,7 @@ import type * as oauth from "../oauth.js";
 import type * as persist from "../persist.js";
 import type * as sync from "../sync.js";
 import type * as validators from "../validators.js";
+import type * as webhooks from "../webhooks.js";
 import type * as workspaces from "../workspaces.js";
 
 import type {
@@ -69,6 +70,7 @@ declare const fullApi: ApiFromModules<{
   persist: typeof persist;
   sync: typeof sync;
   validators: typeof validators;
+  webhooks: typeof webhooks;
   workspaces: typeof workspaces;
 }>;
 

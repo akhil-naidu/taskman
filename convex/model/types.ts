@@ -4,6 +4,15 @@ export type TaskStatus = (typeof TASK_STATUSES)[number];
 export const BOT_STATUSES = ["waiting", "active", "routine", "on-demand"] as const;
 export type BotStatus = (typeof BOT_STATUSES)[number];
 
+export const RELAY_STATUSES = ["delivered", "retrying", "undelivered", "relayed"] as const;
+export type RelayStatus = (typeof RELAY_STATUSES)[number];
+
+export const WEBHOOK_EVENTS = ["decision_recorded", "task_approved", "instruction_added"] as const;
+export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
+
+export const DELIVERY_STATUSES = ["pending", "delivered", "undelivered", "relayed"] as const;
+export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
+
 export const PROVIDERS = ["clickup", "github", "linear", "jira", "fleet"] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
@@ -106,6 +115,10 @@ export type BotRow = {
   currentTaskKey?: string;
   currentTaskText?: string;
   lastHeartbeatAt?: number;
+  webhookConfigured?: boolean;
+  webhookLastDeliveryAt?: number;
+  webhookLastError?: string;
+  relayStatus?: RelayStatus;
   updatedAt: number;
 };
 
@@ -193,6 +206,23 @@ export type IngestRunRow = {
   message: string;
 };
 
+export type WebhookDelivery = {
+  key: string;
+  botKey: string;
+  event: WebhookEvent;
+  taskKey: string;
+  title: string;
+  decision: string;
+  boardUrl: string;
+  status: DeliveryStatus;
+  attempts: number;
+  lastError: string;
+  createdAt: number;
+  updatedAt: number;
+  deliveredAt: number;
+  relayedAt: number;
+};
+
 export type FleetState = {
   bots: BotRow[];
   routines: RoutineRow[];
@@ -202,6 +232,7 @@ export type FleetState = {
   syncLinks: SyncLinkRow[];
   ingestRuns: IngestRunRow[];
   instructions: InstructionRow[];
+  deliveries: WebhookDelivery[];
 };
 
 export type RemoteTask = {
@@ -235,6 +266,10 @@ export type BotView = {
   heartbeatStatus: string;
   lastHeartbeatAt: number;
   currentTask: string;
+  webhookConfigured: boolean;
+  webhookLastDeliveryAt: number;
+  webhookLastError: string;
+  relayStatus: RelayStatus | "";
 };
 
 export type TaskView = {
@@ -273,6 +308,7 @@ export type FleetView = {
   bots: BotView[];
   tasks: TaskView[];
   instructions: InstructionView[];
+  relayWaiting: number;
   tiles: {
     bots: number;
     orgs: number;

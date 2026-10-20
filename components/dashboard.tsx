@@ -5,11 +5,13 @@ import { useState } from "react";
 import { Shell } from "@/components/shell";
 import { TaskTable } from "@/components/task-table";
 import { Button } from "@/components/ui/button";
+import { Badge as Chip } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { formatIst } from "@/convex/model/clock";
 import { BOARD_COLUMNS, boardColumn } from "@/convex/model/columns";
 import { orgSlug } from "@/convex/model/orgs";
 import type { BotView, FleetView, SyncProvider, TaskView } from "@/convex/model/types";
+import { isOrchestrator } from "@/convex/model/webhooks";
 import { orgOptions } from "@/convex/model/view";
 
 const PROVIDERS: { id: SyncProvider; label: string }[] = [
@@ -38,7 +40,7 @@ export function Dashboard({
   syncMessage?: string;
   onApprove?: (key: string) => void;
   onAnswer?: (key: string, answer: string) => void;
-  onQueue?: (body: string) => void;
+  onQueue?: (body: string, botKey?: string) => void;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -205,7 +207,7 @@ function BoardPage({
   syncMessage?: string;
   onApprove?: (key: string) => void;
   onAnswer?: (key: string, answer: string) => void;
-  onQueue?: (body: string) => void;
+  onQueue?: (body: string, botKey?: string) => void;
 }) {
   const tasks = model.tasks.filter((task) => orgMatches(task.org, selected) && taskMatches(needle, task));
   const conflicts = tasks.filter((task) => task.conflict).length;
@@ -230,6 +232,7 @@ function BoardPage({
           ))}
         </div>
       </div>
+      <BoardStatus model={model} />
       {syncMessage ? (
         <p className="mb-4 text-sm text-muted-foreground" aria-live="polite">
           {syncMessage}
@@ -275,7 +278,11 @@ function BotCard({ bot }: { bot: BotView }) {
           {bot.name.slice(0, 1).toUpperCase()}
         </span>
         <div className="min-w-0">
-          <div className="font-semibold">{bot.name}</div>
+          <div className="flex flex-wrap items-center gap-1.5 font-semibold">
+            {bot.name}
+            {isOrchestrator(bot.role) ? <Chip variant="outline">Orchestrator</Chip> : null}
+            {!bot.webhookConfigured ? <Chip variant="outline">No webhook</Chip> : null}
+          </div>
           <div className="text-xs text-[var(--mu)]">
             {bot.org} · {bot.avatarColor} {bot.avatarShape}
           </div>
@@ -294,6 +301,12 @@ function BotCard({ bot }: { bot: BotView }) {
         <dd>{bot.openCount}</dd>
         <dt className="text-[var(--mu)]">Current</dt>
         <dd>{bot.currentWork}</dd>
+        <dt className="text-[var(--mu)]">Webhook</dt>
+        <dd>
+          <WebhookHealth bot={bot} />
+        </dd>
+        <dt className="text-[var(--mu)]">Relay</dt>
+        <dd>{relayText(bot.relayStatus)}{bot.webhookLastError ? ` · ${bot.webhookLastError}` : ""}</dd>
       </dl>
       <details className="mt-3 border-t border-[var(--line)] pt-2" open>
         <summary className="cursor-pointer text-[13px] text-[var(--mu)]">Recent activity ({bot.activity.length})</summary>
@@ -343,12 +356,15 @@ function BotsPage({ model, selected, needle }: { model: FleetView; selected: str
     return <p className="rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">No bots yet</p>;
   }
   return (
-    <div className="overflow-hidden rounded-md border border-border">
+    <div className="overflow-x-auto rounded-md border border-border">
       <table className="w-full text-left text-sm">
         <thead className="border-b border-border text-xs text-muted-foreground">
           <tr>
             <th className="px-3 py-2 font-medium">Bot</th>
+            <th className="px-3 py-2 font-medium">Role</th>
             <th className="px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 font-medium">Webhook</th>
+            <th className="px-3 py-2 font-medium">Relay</th>
             <th className="px-3 py-2 font-medium">Last heartbeat</th>
             <th className="px-3 py-2 font-medium">Current task</th>
           </tr>
@@ -360,7 +376,15 @@ function BotsPage({ model, selected, needle }: { model: FleetView; selected: str
                 <div className="font-medium">{bot.name}</div>
                 <div className="text-xs text-muted-foreground">{bot.org}</div>
               </td>
+              <td className="px-3 py-2">
+                <span className="mr-1">{bot.role}</span>
+                {isOrchestrator(bot.role) ? <Chip variant="outline">Orchestrator</Chip> : null}
+              </td>
               <td className="px-3 py-2">{bot.heartbeatStatus || bot.status}</td>
+              <td className="px-3 py-2">
+                <WebhookHealth bot={bot} />
+              </td>
+              <td className="px-3 py-2">{relayText(bot.relayStatus)}</td>
               <td className="px-3 py-2 text-muted-foreground">{bot.lastHeartbeatAt ? formatIst(bot.lastHeartbeatAt) : "No heartbeat"}</td>
               <td className="px-3 py-2">{bot.currentTask || bot.currentWork}</td>
             </tr>
@@ -419,8 +443,9 @@ function AnswerForm({ task, onAnswer }: { task: TaskView; onAnswer?: (key: strin
   );
 }
 
-function QueueForm({ onQueue }: { onQueue?: (body: string) => void }) {
+function QueueForm({ onQueue }: { onQueue?: (body: string, botKey?: string) => void }) {
   const [body, setBody] = useState("");
+  const [botKey, setBotKey] = useState("");
   if (!onQueue) return null;
   return (
     <form
@@ -428,11 +453,12 @@ function QueueForm({ onQueue }: { onQueue?: (body: string) => void }) {
       onSubmit={(event) => {
         event.preventDefault();
         if (!body.trim()) return;
-        onQueue(body.trim());
+        onQueue(body.trim(), botKey.trim() || undefined);
         setBody("");
       }}
     >
       <Input value={body} onChange={(event) => setBody(event.target.value)} aria-label="Instruction for a bot" placeholder="Queue an instruction for the next wake" />
+      <Input value={botKey} onChange={(event) => setBotKey(event.target.value)} aria-label="Bot" placeholder="Bot key" className="sm:max-w-40" />
       <Button type="submit" variant="outline" disabled={!body.trim()}>
         Queue
       </Button>
@@ -533,6 +559,56 @@ function Tile({ label, value, hot = false }: { label: string; value: number; hot
       <div className="text-xs text-[var(--mu)]">{label}</div>
     </div>
   );
+}
+
+function WebhookHealth({ bot }: { bot: BotView }) {
+  if (!bot.webhookConfigured) return <Chip variant="outline">No webhook</Chip>;
+  return (
+    <div>
+      <div>{bot.webhookLastDeliveryAt ? formatIst(bot.webhookLastDeliveryAt) : "No delivery"}</div>
+      {bot.webhookLastError ? <div className="text-xs text-destructive">{bot.webhookLastError}</div> : null}
+    </div>
+  );
+}
+
+function BoardStatus({ model }: { model: FleetView }) {
+  const missing = model.bots.filter((bot) => !bot.webhookConfigured);
+  const orchestrators = model.bots.filter((bot) => isOrchestrator(bot.role));
+  if (missing.length === 0 && orchestrators.length === 0 && model.relayWaiting === 0) return null;
+  return (
+    <div className="mb-4 flex flex-wrap gap-1.5" aria-label="Webhook status">
+      {orchestrators.map((bot) => (
+        <Chip key={bot.key} variant="outline">
+          Orchestrator {bot.name}
+        </Chip>
+      ))}
+      {model.relayWaiting > 0 ? <Chip variant="outline">{model.relayWaiting} undelivered</Chip> : null}
+      {missing.map((bot) => (
+        <Chip key={`webhook-${bot.key}`} variant="outline">
+          No webhook {bot.name}
+        </Chip>
+      ))}
+    </div>
+  );
+}
+
+function relayText(status: BotView["relayStatus"]): string {
+  switch (status) {
+    case "delivered":
+      return "Delivered";
+    case "retrying":
+      return "Retrying";
+    case "undelivered":
+      return "Undelivered";
+    case "relayed":
+      return "Relayed";
+    case "":
+      return "No relay";
+    default: {
+      const unexpected: never = status;
+      return unexpected;
+    }
+  }
 }
 
 function StatusPill({ status }: { status: BotView["status"] }) {
