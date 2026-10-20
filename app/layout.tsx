@@ -2,6 +2,10 @@ import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import type { Metadata } from "next";
 import { ClientProvider } from "@/components/client-provider";
 import "./globals.css";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "taskman",
@@ -10,11 +14,11 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const tree = (
-    <html lang="en" data-theme="dark" className="h-full antialiased" suppressHydrationWarning>
+    <html lang="en" data-theme="dark" className={cn("dark h-full antialiased", "font-sans", geist.variable)} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem("taskman-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`,
+            __html: `try{var t=localStorage.getItem("taskman-theme");var dark=t!=="light";document.documentElement.classList.toggle("dark",dark);if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`,
           }}
         />
       </head>

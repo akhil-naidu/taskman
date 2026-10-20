@@ -85,23 +85,28 @@ export function planSnapshot(
   }
   const botByKey = new Map(snapshot.bots.map((bot) => [bot.key, bot]));
 
-  const bots: BotRow[] = snapshot.bots.map((bot) => ({
-    key: bot.key,
-    name: bot.name,
-    description: bot.description,
-    role: bot.role,
-    org: bot.org,
-    orgColor: bot.orgColor,
-    avatarColor: bot.avatarColor,
-    avatarShape: bot.avatarShape,
-    wake: bot.wake,
-    lastRunText: bot.lastRun,
-    openCount: bot.open.length,
-    openItems: [...bot.open],
-    activity: [...bot.activity],
-    notes: [...bot.notes],
-    updatedAt: now,
-  }));
+  const reportedByKey = new Map(existing.bots.map((bot) => [bot.key, bot.reportedStatus]));
+  const bots: BotRow[] = snapshot.bots.map((bot) => {
+    const reportedStatus = reportedByKey.get(bot.key);
+    return {
+      key: bot.key,
+      name: bot.name,
+      description: bot.description,
+      role: bot.role,
+      org: bot.org,
+      orgColor: bot.orgColor,
+      avatarColor: bot.avatarColor,
+      avatarShape: bot.avatarShape,
+      wake: bot.wake,
+      lastRunText: bot.lastRun,
+      openCount: bot.open.length,
+      openItems: [...bot.open],
+      activity: [...bot.activity],
+      notes: [...bot.notes],
+      ...(reportedStatus ? { reportedStatus } : {}),
+      updatedAt: now,
+    };
+  });
   const nextBotKeys = new Set(bots.map((bot) => bot.key));
   const botMap = new Map((replace ? [] : existing.bots).map((bot) => [bot.key, bot]));
   for (const bot of bots) botMap.set(bot.key, bot);

@@ -100,6 +100,7 @@ export type BotRow = {
   openItems: string[];
   activity: string[];
   notes: string[];
+  reportedStatus?: BotStatus;
   updatedAt: number;
 };
 
