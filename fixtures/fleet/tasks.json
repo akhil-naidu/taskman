@@ -1,0 +1,34 @@
+[
+  {
+    "key": "board-weekly-note",
+    "title": "Prepare the weekly fleet note",
+    "status": "in_progress",
+    "owner": "bot-a",
+    "org": "Talleflow"
+  },
+  {
+    "key": "board-archive",
+    "title": "Archive last month's notes",
+    "status": "done",
+    "owner": "bot-c",
+    "org": "Gatekart"
+  },
+  {
+    "key": "clickup:cu-1001",
+    "title": "Sample imported ticket",
+    "status": "todo",
+    "owner": "bot-b",
+    "org": "dFlow",
+    "source": "clickup",
+    "externalId": "cu-1001",
+    "url": "https://example.com/tasks/cu-1001"
+  },
+  {
+    "key": "board-shared-checklist",
+    "title": "Refresh the shared release checklist",
+    "status": "in_progress",
+    "owner": "bot-a",
+    "org": "Talleflow",
+    "claimants": ["bot-a", "bot-d"]
+  }
+]

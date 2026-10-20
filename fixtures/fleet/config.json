@@ -1,0 +1,32 @@
+{
+  "org_map": {
+    "bot-a": "Talleflow",
+    "bot-b": "dFlow",
+    "bot-c": "Gatekart",
+    "bot-d": "personal",
+    "bot-e": "fleet"
+  },
+  "org_colours": {
+    "Talleflow": "#16a34a",
+    "dFlow": "#ea580c",
+    "Gatekart": "#2563eb",
+    "personal": "#6b7280",
+    "fleet": "#6b7280"
+  },
+  "known_routines": {
+    "bot-a": ["Morning digest"],
+    "bot-d": ["Inbox watch"]
+  },
+  "notes": {
+    "bot-a": ["notes/bot-a.md"],
+    "bot-b": ["notes/bot-b.md"],
+    "bot-d": ["notes/bot-d.md"],
+    "bot-e": ["notes/bot-e.md"]
+  },
+  "last_run": {
+    "bot-a": "2026-10-20 09:10 IST"
+  },
+  "role_override": {
+    "bot-e": "Example fleet coordinator for sample data"
+  }
+}
