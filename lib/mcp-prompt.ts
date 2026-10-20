@@ -1,4 +1,4 @@
-import { newBotSetupSection, orchestratorSetupPrompt } from "@/convex/model/setup-prompt";
+import { newBotSetupSection, orchestratorSetupPrompt } from "@/convex/model/setupPrompt";
 
 export function mcpEndpoint(origin: string): string {
   return `${origin.replace(/\/$/, "")}/api/mcp`;

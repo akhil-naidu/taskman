@@ -40,6 +40,8 @@ CONVEX_DEPLOY_KEY='<dev deploy key>' npx convex dev --once
 
 `npx convex deploy` targets a production or preview deployment. Use `npx convex dev --once` for this dev deployment.
 
+The release image runs `npx convex deploy` with `CONVEX_DEPLOY_KEY`, checks that `workspaces:reset` is public, then runs `pnpm build`. Set `CONVEX_DEPLOY_KEY` on the web service so the Docker build can see it. Do not set `CONVEX_DEPLOYMENT` in that build. The key selects the deployment.
+
 Set platform environment variables on the same deployment. The key selects the deployment, so these commands do not need `--prod`:
 
 ```bash

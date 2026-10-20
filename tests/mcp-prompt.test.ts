@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { newBotSetupSection } from "../convex/model/setup-prompt";
+import { newBotSetupSection } from "../convex/model/setupPrompt";
 import { mcpEndpoint, mcpSetupPrompt, onboardingStorageKey, resolveSiteOrigin } from "../lib/mcp-prompt";
 
 describe("mcp setup prompt", () => {

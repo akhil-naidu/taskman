@@ -1,6 +1,8 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
+# The image build runs `npx convex deploy` before `pnpm build`.
+# Set CONVEX_DEPLOY_KEY on the service. Do not commit the value.
 
 [deploy]
 startCommand = "node server.js"
